@@ -20,6 +20,20 @@ export interface Message {
   timestamp: number;
 }
 
+interface ProjectStructure {
+  description: string;
+  directories: {
+    name: string;
+    description: string;
+    contents: Array<{
+      name: string;
+      type: 'file' | 'directory';
+      description: string;
+      tech?: string;
+    }>;
+  }[];
+}
+
 interface ConversationStore {
   messages: Message[];
   context: ConversationContext;
@@ -27,9 +41,12 @@ interface ConversationStore {
   error: string | null;
   projectId: string | null;
   conversationId: string | null;
+  projectStructure: ProjectStructure | null;
+  isGeneratingStructure: boolean;
   initializeProject: () => Promise<void>;
   loadConversation: (conversationId: string) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
+  generateProjectStructure: () => Promise<void>;
   reset: () => void;
 }
 
@@ -55,12 +72,13 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   error: null,
   projectId: null,
   conversationId: null,
+  projectStructure: null,
+  isGeneratingStructure: false,
 
   initializeProject: async () => {
     try {
       set({ isLoading: true, error: null });
 
-      // Create new project through API
       const response = await fetch('/api/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,11 +141,43 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
   },
 
+  generateProjectStructure: async () => {
+    const state = get();
+    const requirements = state.context.extractedInfo.requirements;
+
+    if (!requirements?.length) {
+      set({ error: 'No requirements available to generate project structure' });
+      return;
+    }
+
+    try {
+      set({ isGeneratingStructure: true, error: null });
+
+      const response = await fetch('/api/project-structure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requirements }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate project structure: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      set({ projectStructure: data.structure, isGeneratingStructure: false });
+    } catch (error) {
+      console.error('Error generating project structure:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to generate project structure',
+        isGeneratingStructure: false,
+      });
+    }
+  },
+
   sendMessage: async (content: string) => {
     try {
       set({ isLoading: true, error: null });
       
-      // Create new message
       const conversationId = get().conversationId || uuidv4();
       const newMessage: Message = {
         id: uuidv4(),
@@ -137,12 +187,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         timestamp: Date.now(),
       };
 
-      // Add message to state
       set(state => ({
         messages: [...state.messages, newMessage],
       }));
 
-      // Send to API
       const response = await fetch('/api/conversation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,7 +211,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error(data.error);
       }
 
-      // Create assistant message
       const assistantMessage: Message = {
         id: uuidv4(),
         conversationId,
@@ -172,7 +219,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         timestamp: Date.now(),
       };
 
-      // Update state with new message and context
       set(state => ({
         messages: [...state.messages, assistantMessage],
         context: {
@@ -227,6 +273,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       error: null,
       projectId: null,
       conversationId: null,
+      projectStructure: null,
+      isGeneratingStructure: false,
     });
   },
 }));

@@ -2,6 +2,8 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { useConversationStore } from '../../lib/stores/conversation';
+import { ProjectStructure } from './ProjectStructure';
+import { FolderIcon } from 'lucide-react';
 
 export function ConversationUI() {
   const {
@@ -10,23 +12,31 @@ export function ConversationUI() {
     isLoading,
     error,
     sendMessage,
-    reset
+    reset,
+    projectStructure,
+    isGeneratingStructure,
+    generateProjectStructure
   } = useConversationStore();
 
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (context.overallUnderstanding === 100 && !projectStructure && !isGeneratingStructure) {
+      generateProjectStructure();
+    }
+  }, [context.overallUnderstanding, projectStructure, isGeneratingStructure, generateProjectStructure]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || isLoading) return;
 
     const message = inputText;
-    setInputText(''); // Clear input after sending
+    setInputText('');
     await sendMessage(message);
   };
 
@@ -246,6 +256,19 @@ export function ConversationUI() {
                 </li>
               ))}
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Project Structure Panel */}
+      {projectStructure && <ProjectStructure structure={projectStructure} />}
+
+      {/* Loading State for Project Structure Generation */}
+      {isGeneratingStructure && (
+        <div className="fixed right-4 top-[400px] w-96 bg-white rounded-lg shadow-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-gray-600">Generating project structure...</span>
           </div>
         </div>
       )}
