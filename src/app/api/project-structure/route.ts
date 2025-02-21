@@ -45,7 +45,7 @@ Respond with ONLY a JSON object in this format:
       },
       body: JSON.stringify({
         model: 'claude-3-5-sonnet-latest',
-        max_tokens: 4096,
+        max_tokens: 8192,
         temperature: 0.7,
         messages: [
           {

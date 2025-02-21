@@ -1,3 +1,11 @@
+#!/bin/bash
+
+# Create a backup of the original ConversationUI.tsx
+echo "Creating backup of ConversationUI.tsx..."
+cp src/components/conversation/ConversationUI.tsx src/components/conversation/ConversationUI.tsx.bak
+
+# Update ConversationUI.tsx with the new changes
+cat > src/components/conversation/ConversationUI.tsx << 'EOF'
 "use client";
 
 import { useRef, useEffect, useState } from 'react';
@@ -303,3 +311,4 @@ function getMetricDescription(metric: string): string {
       return '';
   }
 }
+EOF
