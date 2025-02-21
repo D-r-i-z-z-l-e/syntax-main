@@ -32,7 +32,7 @@ export interface ExtractedContext {
 export class ClaudeService {
   private static instance: ClaudeService;
   private apiKey: string;
-  private readonly MODEL = 'claude-3-sonnet-20240229';
+  private readonly MODEL = 'claude-3-5-sonnet-latest';
 
   private constructor() {
     this.apiKey = process.env.CLAUDE_API_KEY || '';
