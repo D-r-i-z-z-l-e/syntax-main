@@ -1,3 +1,15 @@
+#!/bin/bash
+
+# Create backup directory
+mkdir -p ./backups
+
+# Backup original file
+echo "Creating backup..."
+cp src/lib/claude/index.ts ./backups/index.ts.bak 2>/dev/null || true
+
+# Update the Claude service file
+echo "Updating Claude service for Sonnet 3.5..."
+cat > src/lib/claude/index.ts << 'EOL'
 import { Message } from '../stores/conversation';
 
 export interface UnderstandingMetrics {
@@ -41,7 +53,7 @@ interface RequirementItem {
 export class ClaudeService {
   private static instance: ClaudeService;
   private apiKey: string;
-  private readonly MODEL = 'claude-3-5-sonnet-latest';
+  private readonly MODEL = 'claude-3-sonnet-20240229';
 
   private constructor() {
     this.apiKey = process.env.CLAUDE_API_KEY || '';
@@ -237,3 +249,4 @@ Remember:
     );
   }
 }
+EOL
