@@ -29,10 +29,19 @@ export interface ExtractedContext {
   overallUnderstanding?: number;
 }
 
+interface RequirementItem {
+  category: string;
+  what: string;
+  why: string;
+  how: string;
+  status: 'explicit' | 'implicit' | 'suggested';
+  dependencies: string;
+}
+
 export class ClaudeService {
   private static instance: ClaudeService;
   private apiKey: string;
-  private readonly MODEL = 'claude-3-5-sonnet-20241022';
+  private readonly MODEL = 'claude-3-5-sonnet-latest';
 
   private constructor() {
     this.apiKey = process.env.CLAUDE_API_KEY || '';
@@ -55,7 +64,11 @@ export class ClaudeService {
     }));
   }
 
-public async continueConversation(
+  private formatRequirement(req: RequirementItem): string {
+    return `${req.category} - What: ${req.what} | Why: ${req.why} | How: ${req.how} | Status: ${req.status} | Dependencies: ${req.dependencies}`;
+  }
+
+  public async continueConversation(
     messages: Message[],
     context: ConversationContext
   ): Promise<{
@@ -100,64 +113,38 @@ public async continueConversation(
         throw new Error('Invalid response format from Claude API');
       }
 
-      // Extract the JSON content
-      const contentText = data.content[0].text;
-      let jsonStartIndex = contentText.indexOf('{');
-      let jsonEndIndex = contentText.lastIndexOf('}');
-      
-      if (jsonStartIndex === -1 || jsonEndIndex === -1) {
-        throw new Error('No valid JSON found in response');
-      }
-
-      const jsonStr = contentText.substring(jsonStartIndex, jsonEndIndex + 1);
-      console.log('Attempting to parse JSON:', jsonStr);
-
       let parsedResponse;
       try {
-        parsedResponse = JSON.parse(jsonStr);
+        parsedResponse = JSON.parse(data.content[0].text);
       } catch (e) {
-        console.error('Failed to parse JSON:', e);
-        // Try to clean the string
-        const cleanedJson = jsonStr
-          .replace(/\n/g, ' ')             // Remove newlines
-          .replace(/\r/g, ' ')             // Remove carriage returns
-          .replace(/\t/g, ' ')             // Remove tabs
-          .replace(/\\"/g, '"')            // Fix escaped quotes
-          .replace(/([{,]\s*)"([^"]+)":/g, '$1$2:') // Remove quotes from property names
-          .replace(/:\s*"([^"]+)"/g, ': "$1"')      // Keep quotes around values
-          .replace(/\s+/g, ' ');           // Collapse multiple spaces
-        
-        try {
-          parsedResponse = JSON.parse(cleanedJson);
-        } catch (e2) {
-          console.error('Failed to parse cleaned JSON:', e2);
-          throw new Error('Failed to parse response from Claude after cleanup');
-        }
+        console.error('Failed to parse Claude response:', data.content[0].text);
+        throw new Error('Failed to parse response from Claude');
       }
 
-      // Validate the parsed response structure
-      if (!parsedResponse || typeof parsedResponse !== 'object') {
-        throw new Error('Invalid response structure');
+      // Extract and process requirements
+      let formattedRequirements: string[] = [];
+      if (parsedResponse.extractedContext?.requirements) {
+        formattedRequirements = parsedResponse.extractedContext.requirements.map((req: RequirementItem) => 
+          this.formatRequirement(req)
+        );
       }
 
-      if (!parsedResponse.response || !parsedResponse.metrics || !parsedResponse.extractedInfo) {
-        throw new Error('Missing required fields in response');
-      }
-
+      // Process metrics
       const validatedMetrics = {
-        coreConcept: Math.max(context.understanding.coreConcept, Math.min(100, parsedResponse.metrics.coreConcept || 0)),
-        requirements: Math.max(context.understanding.requirements, Math.min(100, parsedResponse.metrics.requirements || 0)),
-        technical: Math.max(context.understanding.technical, Math.min(100, parsedResponse.metrics.technical || 0)),
-        constraints: Math.max(context.understanding.constraints, Math.min(100, parsedResponse.metrics.constraints || 0)),
-        userContext: Math.max(context.understanding.userContext, Math.min(100, parsedResponse.metrics.userContext || 0))
+        coreConcept: Math.max(context.understanding.coreConcept, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.coreConcept || 0)),
+        requirements: Math.max(context.understanding.requirements, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.requirements || 0)),
+        technical: Math.max(context.understanding.technical, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.technical || 0)),
+        constraints: Math.max(context.understanding.constraints, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.constraints || 0)),
+        userContext: Math.max(context.understanding.userContext, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.userContext || 0))
       };
 
+      // Return formatted response
       return {
         response: parsedResponse.response,
         extractedContext: {
-          requirements: parsedResponse.extractedInfo.requirements || [],
-          technicalDetails: parsedResponse.extractedInfo.technicalDetails || [],
-          nextPhase: parsedResponse.nextPhase || context.currentPhase,
+          requirements: formattedRequirements,
+          technicalDetails: parsedResponse.extractedContext?.technicalDetails || [],
+          nextPhase: parsedResponse.extractedContext?.nextPhase || context.currentPhase,
           understandingUpdate: validatedMetrics,
           overallUnderstanding: this.calculateOverallUnderstanding(validatedMetrics)
         }
@@ -170,83 +157,66 @@ public async continueConversation(
   }
 
   private generateSystemPrompt(context: ConversationContext): string {
-    return `You are an experienced software architect having a conversation with a client about their project requirements. Your goal is to extract and organize clear, actionable requirements while identifying areas that need clarification. Keep requirements focused and specific.
+    return `You are an experienced software architect having a conversation with a client about their project requirements. Your goal is to extract and organize clear, actionable requirements while identifying areas that need clarification.
 
-IMPORTANT GUIDELINES FOR REQUIREMENT EXTRACTION:
-
-1. For Each Requirement:
-   Base Format: "Category - What: [description] | Why: [purpose] | How: [implementation] | Status: [explicit/implicit/suggested] | Dependencies: [related items]"
-
-   Categories:
-   - Core Features
-   - User Interface
-   - Data Management
-   - Security
-   - Integration
-   - Performance
-   - Scalability
-
-   Status Types:
-   - explicit: Features directly stated by the user
-   - implicit: Essential technical requirements not mentioned by user
-   - suggested: Optional features that might be beneficial
-
-2. Response Format Rules:
-   - First acknowledge what you clearly understand
-   - Then ask about any unclear points
-   - Always ask for confirmation of implicit requirements
-   - Present suggested features as questions
-
-3. Level of Detail:
-   - Keep requirements atomic and specific
-   - Don't make complex assumptions
-   - Focus on what the user has actually stated
-   - Ask for clarification on implementation details
-
-You MUST respond with ONLY a valid JSON object in the following format:
-
+IMPORTANT: You must respond with a JSON object in exactly this format:
 {
-  "response": "Your response should:
-               1. Confirm what you understand
-               2. Ask about unclear points
-               3. Suggest additional features as questions
-               4. Request confirmation of implicit requirements",
-  "metrics": {
-    "coreConcept": number,     // Understanding of core idea (0-100)
-    "requirements": number,    // Clarity of requirements (0-100)
-    "technical": number,      // Technical understanding (0-100)
-    "constraints": number,    // Understanding of limitations (0-100)
-    "userContext": number    // Understanding of user needs (0-100)
-  },
-  "extractedInfo": {
+  "response": "Your response message here with questions and clarifications",
+  "extractedContext": {
     "requirements": [
-      // Each requirement in the format specified above
+      {
+        "category": "Core Features|User Interface|Data Management|Security|Integration|Performance",
+        "what": "Clear description of the requirement",
+        "why": "Business value or purpose",
+        "how": "Implementation approach",
+        "status": "explicit|implicit|suggested",
+        "dependencies": "Related components or requirements"
+      }
     ],
     "technicalDetails": [
-      // Only confirmed technical specifications
-    ]
-  },
-  "nextPhase": "initial" | "requirements" | "clarification" | "complete"
+      "Technical specification 1",
+      "Technical specification 2"
+    ],
+    "nextPhase": "initial|requirements|clarification|complete",
+    "understandingUpdate": {
+      "coreConcept": 0-100,
+      "requirements": 0-100,
+      "technical": 0-100,
+      "constraints": 0-100,
+      "userContext": 0-100
+    }
+  }
 }
+
+Guidelines for Response:
+1. response field should:
+   - Confirm what you clearly understand
+   - Ask specific questions about unclear points
+   - Present suggested features as questions
+   - Request confirmation of implicit requirements
+
+2. requirements should:
+   - Be specific and actionable
+   - Include only confirmed details
+   - Mark assumptions as "implicit"
+   - Include dependencies
+
+3. Marking Status:
+   - explicit: Directly stated by user
+   - implicit: Technically necessary but not stated
+   - suggested: Optional enhancements
 
 Current phase: ${context.currentPhase}
 Current metrics: ${JSON.stringify(context.understanding, null, 2)}
 
-Example good requirement:
-"Core Features - What: User registration with email verification | Why: Ensure secure user accounts | How: Email service integration with verification tokens | Status: explicit | Dependencies: Email service, User database"
-
-Example bad requirement (too vague):
-"Core Features - What: User system | Why: User management | How: Database storage | Status: explicit | Dependencies: None"
-
-Current extracted information:
-${JSON.stringify(context.extractedInfo, null, 2)}
+Current requirements:
+${JSON.stringify(context.extractedInfo.requirements, null, 2)}
 
 Remember:
-- Validate all JSON before responding
-- Don't include implementation details unless explicitly discussed
-- Keep each requirement focused and specific
-- Always ask about unclear points
-- Flag all assumptions for confirmation`;
+- Always use the exact JSON format specified
+- Make each requirement self-contained
+- Only increase metrics for explicit information
+- Ask for clarification on unclear points`;
   }
 
   private calculateOverallUnderstanding(metrics: UnderstandingMetrics): number {

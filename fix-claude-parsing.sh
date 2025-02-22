@@ -1,3 +1,15 @@
+#!/bin/bash
+
+# Create backup directory
+mkdir -p ./backups
+
+# Backup original file
+echo "Creating backup..."
+cp src/lib/claude/index.ts ./backups/index.ts.bak 2>/dev/null || true
+
+# Update the Claude service file
+echo "Updating Claude service..."
+cat > src/lib/claude/index.ts << 'EOL'
 import { Message } from '../stores/conversation';
 
 export interface UnderstandingMetrics {
@@ -152,20 +164,10 @@ export class ClaudeService {
           }
         };
 
-      } catch (e: unknown) {
-        // Ensure proper error typing
-        const error = e instanceof Error ? e : new Error(String(e));
-        
-        // Log detailed error information
-        console.error('Parse error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
+      } catch (e) {
+        console.error('Parse error details:', e);
         console.error('Failed to parse Claude response:', data.content[0].text);
-        
-        // Throw with context
-        throw new Error(`Failed to parse response from Claude: ${error.message}`);
+        throw new Error(`Failed to parse response from Claude: ${e.message}`);
       }
 
     } catch (error) {
@@ -258,3 +260,4 @@ Remember:
     );
   }
 }
+EOL
