@@ -64,8 +64,17 @@ export class ClaudeService {
     }));
   }
 
-  private formatRequirement(req: RequirementItem): string {
-    return `${req.category} - What: ${req.what} | Why: ${req.why} | How: ${req.how} | Status: ${req.status} | Dependencies: ${req.dependencies}`;
+  private cleanJsonString(str: string): string {
+    // Remove any markdown code block indicators
+    str = str.replace(/^```json\s*|\s*```$/g, '');
+    str = str.replace(/^`|`$/g, '');
+    
+    // Handle escape sequences and control characters
+    str = str.replace(/[\n\r\t]/g, ' '); // Replace newlines, returns, tabs with space
+    str = str.replace(/\s+/g, ' '); // Collapse multiple spaces
+    str = str.replace(/\\([^"\\\/bfnrt])/g, '$1'); // Remove invalid escape sequences
+    
+    return str;
   }
 
   public async continueConversation(
@@ -115,23 +124,33 @@ export class ClaudeService {
 
       let parsedResponse;
       try {
-        const contentText = data.content[0].text;
-        parsedResponse = JSON.parse(contentText);
+        // Clean and parse the response
+        const cleanedText = this.cleanJsonString(data.content[0].text);
+        parsedResponse = JSON.parse(cleanedText);
 
         // Validate response structure
-        if (!parsedResponse.response || !parsedResponse.extractedContext) {
+        if (!parsedResponse || !parsedResponse.response || !parsedResponse.extractedContext) {
           throw new Error('Invalid response structure');
         }
 
-        // Handle requirements
-        let formattedRequirements: string[] = [];
-        if (Array.isArray(parsedResponse.extractedContext.requirements)) {
-          formattedRequirements = parsedResponse.extractedContext.requirements.map((req: RequirementItem) => 
-            this.formatRequirement(req)
-          );
+        // Ensure requirements is an array if it exists
+        if (parsedResponse.extractedContext.requirements) {
+          // Convert requirements to formatted strings if they're objects
+          const formattedRequirements = parsedResponse.extractedContext.requirements.map((req: any) => {
+            if (typeof req === 'object') {
+              return `${req.category} - What: ${req.what} | Why: ${req.why} | How: ${req.how} | Status: ${req.status} | Dependencies: ${req.dependencies}`;
+            }
+            return req;
+          });
+          parsedResponse.extractedContext.requirements = formattedRequirements;
         }
 
-        // Process metrics, defaulting to current values if not provided
+        // Ensure technicalDetails is an array
+        if (!Array.isArray(parsedResponse.extractedContext.technicalDetails)) {
+          parsedResponse.extractedContext.technicalDetails = [];
+        }
+
+        // Process metrics
         const metrics = parsedResponse.extractedContext.understandingUpdate || {};
         const validatedMetrics = {
           coreConcept: Math.max(context.understanding.coreConcept, Math.min(100, metrics.coreConcept || 0)),
@@ -144,7 +163,7 @@ export class ClaudeService {
         return {
           response: parsedResponse.response,
           extractedContext: {
-            requirements: formattedRequirements,
+            requirements: parsedResponse.extractedContext.requirements || [],
             technicalDetails: parsedResponse.extractedContext.technicalDetails || [],
             nextPhase: parsedResponse.extractedContext.nextPhase || context.currentPhase,
             understandingUpdate: validatedMetrics,
@@ -153,18 +172,12 @@ export class ClaudeService {
         };
 
       } catch (e: unknown) {
-        // Ensure proper error typing
         const error = e instanceof Error ? e : new Error(String(e));
-        
-        // Log detailed error information
         console.error('Parse error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
+          error: error.message,
+          rawResponse: data.content[0].text,
+          cleanedResponse: this.cleanJsonString(data.content[0].text)
         });
-        console.error('Failed to parse Claude response:', data.content[0].text);
-        
-        // Throw with context
         throw new Error(`Failed to parse response from Claude: ${error.message}`);
       }
 

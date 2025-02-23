@@ -3,7 +3,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { useConversationStore } from '../../lib/stores/conversation';
 import { ProjectStructure } from './ProjectStructure';
-import { ArchitectOutput } from './ArchitectOutput';
 import { FolderIcon } from 'lucide-react';
 
 export function ConversationUI() {
@@ -16,9 +15,6 @@ export function ConversationUI() {
     reset,
     projectStructure,
     isGeneratingStructure,
-    architectOutput,
-    isArchitectThinking,
-    generateArchitectOutput,
     generateProjectStructure
   } = useConversationStore();
 
@@ -118,7 +114,7 @@ export function ConversationUI() {
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">Syntax AI Architect</h1>
+            <h1 className="text-lg font-semibold text-gray-900">ROSLYN Ai</h1>
             <p className={`text-sm ${getPhaseColor(context.currentPhase)} font-medium`}>
               {getPhaseDescription(context.currentPhase)}
             </p>
@@ -289,10 +285,10 @@ export function ConversationUI() {
         )}
 
         {/* Architect Button */}
-        {requirements.length > 0 && !architectOutput && !isArchitectThinking && (
+        {requirements.length > 0 && !projectStructure && !isGeneratingStructure && (
           <div className="p-4 border-b border-gray-200">
             <button
-              onClick={generateArchitectOutput}
+              onClick={generateProjectStructure}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2.5 flex items-center justify-center transition-colors"
             >
               <FolderIcon className="w-4 h-4 mr-2" />
@@ -301,30 +297,6 @@ export function ConversationUI() {
           </div>
         )}
       </div>
-
-      {/* Architect Output */}
-      <ArchitectOutput
-        architectOutput={architectOutput}
-        onPassToConstructor={() => architectOutput && generateProjectStructure(architectOutput)}
-        isLoading={isArchitectThinking}
-      />
     </div>
   );
-}
-
-export function getMetricDescription(metric: string): string {
-  switch (metric) {
-    case 'coreConcept':
-      return 'Understanding of the main project idea and its core functionality';
-    case 'requirements':
-      return 'Clarity of functional requirements and system capabilities';
-    case 'technical':
-      return 'Understanding of technical needs, architecture, and implementation details';
-    case 'constraints':
-      return 'Understanding of limitations, performance requirements, and system boundaries';
-    case 'userContext':
-      return 'Understanding of user needs, business context, and organizational requirements';
-    default:
-      return '';
-  }
 }

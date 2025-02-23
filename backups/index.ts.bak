@@ -115,40 +115,58 @@ export class ClaudeService {
 
       let parsedResponse;
       try {
-        parsedResponse = JSON.parse(data.content[0].text);
-      } catch (e) {
-        console.error('Failed to parse Claude response:', data.content[0].text);
-        throw new Error('Failed to parse response from Claude');
-      }
+        const contentText = data.content[0].text;
+        parsedResponse = JSON.parse(contentText);
 
-      // Extract and process requirements
-      let formattedRequirements: string[] = [];
-      if (parsedResponse.extractedContext?.requirements) {
-        formattedRequirements = parsedResponse.extractedContext.requirements.map((req: RequirementItem) => 
-          this.formatRequirement(req)
-        );
-      }
-
-      // Process metrics
-      const validatedMetrics = {
-        coreConcept: Math.max(context.understanding.coreConcept, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.coreConcept || 0)),
-        requirements: Math.max(context.understanding.requirements, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.requirements || 0)),
-        technical: Math.max(context.understanding.technical, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.technical || 0)),
-        constraints: Math.max(context.understanding.constraints, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.constraints || 0)),
-        userContext: Math.max(context.understanding.userContext, Math.min(100, parsedResponse.extractedContext?.understandingUpdate?.userContext || 0))
-      };
-
-      // Return formatted response
-      return {
-        response: parsedResponse.response,
-        extractedContext: {
-          requirements: formattedRequirements,
-          technicalDetails: parsedResponse.extractedContext?.technicalDetails || [],
-          nextPhase: parsedResponse.extractedContext?.nextPhase || context.currentPhase,
-          understandingUpdate: validatedMetrics,
-          overallUnderstanding: this.calculateOverallUnderstanding(validatedMetrics)
+        // Validate response structure
+        if (!parsedResponse.response || !parsedResponse.extractedContext) {
+          throw new Error('Invalid response structure');
         }
-      };
+
+        // Handle requirements
+        let formattedRequirements: string[] = [];
+        if (Array.isArray(parsedResponse.extractedContext.requirements)) {
+          formattedRequirements = parsedResponse.extractedContext.requirements.map((req: RequirementItem) => 
+            this.formatRequirement(req)
+          );
+        }
+
+        // Process metrics, defaulting to current values if not provided
+        const metrics = parsedResponse.extractedContext.understandingUpdate || {};
+        const validatedMetrics = {
+          coreConcept: Math.max(context.understanding.coreConcept, Math.min(100, metrics.coreConcept || 0)),
+          requirements: Math.max(context.understanding.requirements, Math.min(100, metrics.requirements || 0)),
+          technical: Math.max(context.understanding.technical, Math.min(100, metrics.technical || 0)),
+          constraints: Math.max(context.understanding.constraints, Math.min(100, metrics.constraints || 0)),
+          userContext: Math.max(context.understanding.userContext, Math.min(100, metrics.userContext || 0))
+        };
+
+        return {
+          response: parsedResponse.response,
+          extractedContext: {
+            requirements: formattedRequirements,
+            technicalDetails: parsedResponse.extractedContext.technicalDetails || [],
+            nextPhase: parsedResponse.extractedContext.nextPhase || context.currentPhase,
+            understandingUpdate: validatedMetrics,
+            overallUnderstanding: this.calculateOverallUnderstanding(validatedMetrics)
+          }
+        };
+
+      } catch (e: unknown) {
+        // Ensure proper error typing
+        const error = e instanceof Error ? e : new Error(String(e));
+        
+        // Log detailed error information
+        console.error('Parse error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+        console.error('Failed to parse Claude response:', data.content[0].text);
+        
+        // Throw with context
+        throw new Error(`Failed to parse response from Claude: ${error.message}`);
+      }
 
     } catch (error) {
       console.error('Error in Claude conversation:', error);
@@ -201,10 +219,13 @@ Guidelines for Response:
    - Mark assumptions as "implicit"
    - Include dependencies
 
-3. Marking Status:
-   - explicit: Directly stated by user
-   - implicit: Technically necessary but not stated
-   - suggested: Optional enhancements
+3. Categories:
+   - Core Features: Essential functionality
+   - User Interface: UI/UX elements
+   - Data Management: Data handling and storage
+   - Security: Security features and compliance
+   - Integration: External system connections
+   - Performance: Speed and efficiency features
 
 Current phase: ${context.currentPhase}
 Current metrics: ${JSON.stringify(context.understanding, null, 2)}
