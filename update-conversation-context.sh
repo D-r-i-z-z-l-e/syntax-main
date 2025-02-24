@@ -1,3 +1,15 @@
+#!/bin/bash
+
+# Create backup directory
+mkdir -p ./backups
+
+# Backup original file
+echo "Creating backup..."
+cp src/lib/claude/index.ts ./backups/index.ts.bak 2>/dev/null || true
+
+# Update the Claude service with improved conversation context
+echo "Updating Claude service..."
+cat > src/lib/claude/index.ts << 'EOF'
 import { Message } from '../stores/conversation';
 
 export interface UnderstandingMetrics {
@@ -301,3 +313,4 @@ Remember:
     );
   }
 }
+EOF
