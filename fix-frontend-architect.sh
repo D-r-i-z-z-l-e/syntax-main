@@ -1,3 +1,202 @@
+#!/bin/bash
+
+echo "Creating a fix focusing on the front-end component handling level transitions..."
+
+# Backup the ArchitectOutput component
+cp src/components/conversation/ArchitectOutput.tsx src/components/conversation/ArchitectOutput.tsx.bak
+
+# Update the ArchitectOutput component to correctly handle the level transitions
+cat > src/components/conversation/ArchitectOutput.tsx << 'EOF'
+import React from 'react';
+import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon } from 'lucide-react';
+import { ArchitectLevel2, FileContext } from '../../lib/types/architect';
+
+interface ArchitectOutputProps {
+  level1Output: { visionText: string } | null;
+  level2Output: ArchitectLevel2 | null;
+  level3Output: { implementationOrder: FileContext[] } | null;
+  currentLevel: 1 | 2 | 3;
+  isThinking: boolean;
+  error: string | null;
+  onProceedToNextLevel: () => void;
+}
+
+export function ArchitectOutput({
+  level1Output,
+  level2Output,
+  level3Output,
+  currentLevel,
+  isThinking,
+  error,
+  onProceedToNextLevel
+}: ArchitectOutputProps) {
+  // Debug logging to check what data is actually available
+  console.log('ArchitectOutput rendering with:', {
+    hasLevel1: !!level1Output,
+    hasLevel2: !!level2Output,
+    hasLevel3: !!level3Output,
+    currentLevel,
+    isThinking,
+    error
+  });
+  
+  if (level2Output) {
+    console.log('Level2Output data structure:', JSON.stringify(level2Output));
+  }
+
+  const getButtonText = () => {
+    switch (currentLevel) {
+      case 1:
+        return 'Design Folder Structure';
+      case 2:
+        return 'Create Implementation Plan';
+      case 3:
+        return 'Generate Project Structure';
+      default:
+        return 'Proceed';
+    }
+  };
+
+  // Check if we have the required data to proceed to next level
+  const canProceedToNextLevel = () => {
+    switch (currentLevel) {
+      case 1:
+        return !!level1Output?.visionText;
+      case 2:
+        return !!level2Output?.rootFolder;
+      case 3:
+        return !!level3Output?.implementationOrder;
+      default:
+        return false;
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="fixed bottom-4 right-4 w-96 bg-red-50 rounded-lg shadow-lg border border-red-200 p-4">
+        <h2 className="text-sm font-semibold text-red-900 mb-2">Error</h2>
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
+
+  if (!level1Output && !isThinking) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 w-96 bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-h-[80vh] overflow-y-auto">
+      {isThinking ? (
+        <div className="flex items-center justify-center space-x-2">
+          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-gray-600">
+            {currentLevel === 1 && "Analyzing requirements..."}
+            {currentLevel === 2 && "Designing folder structure..."}
+            {currentLevel === 3 && "Planning implementation details..."}
+          </span>
+        </div>
+      ) : (
+        <>
+          {/* Level 1: Architectural Vision */}
+          {level1Output && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                <CodeIcon className="w-4 h-4 mr-1" />
+                Architectural Vision
+              </h3>
+              <div className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-3 max-h-[300px] overflow-y-auto">
+                {level1Output.visionText}
+              </div>
+            </div>
+          )}
+
+          {/* Level 2: Folder Structure */}
+          {level2Output && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                <FolderIcon className="w-4 h-4 mr-1" />
+                Project Structure
+              </h3>
+              <div className="bg-gray-50 rounded-lg p-3 max-h-[300px] overflow-y-auto">
+                {level2Output.rootFolder && renderFolderStructure(level2Output.rootFolder)}
+              </div>
+            </div>
+          )}
+
+          {/* Level 3: Implementation Plan */}
+          {level3Output && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                <FileIcon className="w-4 h-4 mr-1" />
+                Implementation Plan
+              </h3>
+              <div className="bg-gray-50 rounded-lg p-3 max-h-[300px] overflow-y-auto">
+                {level3Output.implementationOrder.map((file, index) => (
+                  <div key={index} className="mb-3 last:mb-0">
+                    <p className="text-xs font-medium">{file.path}/{file.name}</p>
+                    <p className="text-xs text-gray-600">{file.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={onProceedToNextLevel}
+            disabled={!canProceedToNextLevel()}
+            className={`mt-4 w-full ${canProceedToNextLevel() 
+              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            } font-medium rounded-lg px-4 py-2.5 flex items-center justify-center transition-colors`}
+          >
+            <ArrowRightIcon className="w-4 h-4 mr-2" />
+            {getButtonText()}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function renderFolderStructure(folder: ArchitectLevel2['rootFolder'], depth = 0) {
+  if (!folder) {
+    console.error('Trying to render null/undefined folder structure');
+    return <div className="text-red-500">Error: Invalid folder structure</div>;
+  }
+  
+  return (
+    <div className={`${depth > 0 ? 'ml-4' : ''}`}>
+      <div className="flex items-start gap-2">
+        <FolderIcon className="w-4 h-4 mt-1 text-blue-500" />
+        <div>
+          <p className="text-xs font-medium">{folder.name}</p>
+          <p className="text-xs text-gray-600">{folder.description}</p>
+        </div>
+      </div>
+      {folder.subfolders?.map((subfolder, index) => (
+        <div key={index} className="ml-2 mt-2 border-l-2 border-gray-200 pl-2">
+          {renderFolderStructure(subfolder, depth + 1)}
+        </div>
+      ))}
+    </div>
+  );
+}
+EOF
+
+# Now let's also create a utility function to log the state at critical points
+cat > src/lib/utils/debug.ts << 'EOF'
+export function debugLog(component: string, action: string, data: any) {
+  console.log(`[${component}] ${action}:`, JSON.stringify(data, (key, value) => {
+    if (typeof value === 'string' && value.length > 100) {
+      return value.substring(0, 100) + '...';
+    }
+    return value;
+  }, 2));
+}
+EOF
+
+# Update conversation.ts to use the debug utility
+cp src/lib/stores/conversation.ts src/lib/stores/conversation.ts.bak3
+
+cat > src/lib/stores/conversation.ts << 'EOF'
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState } from '../types/architect';
@@ -503,3 +702,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     });
   },
 }));
+EOF
+
+echo "The front-end components have been updated to better debug and handle level transitions."
+echo "To apply the changes, please restart your development server."
+echo "After restarting, check the browser console for detailed logging."
+echo "Done!"
+
+# Make the script executable

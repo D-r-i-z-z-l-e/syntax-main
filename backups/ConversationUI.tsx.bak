@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useConversationStore } from '../../lib/stores/conversation';
 import { ProjectStructure } from './ProjectStructure';
+import { ArchitectOutput } from './ArchitectOutput';
 import { FolderIcon } from 'lucide-react';
 
 export function ConversationUI() {
@@ -15,6 +16,10 @@ export function ConversationUI() {
     reset,
     projectStructure,
     isGeneratingStructure,
+    architect,
+    generateArchitectLevel1,
+    generateArchitectLevel2,
+    generateArchitectLevel3,
     generateProjectStructure
   } = useConversationStore();
 
@@ -114,7 +119,7 @@ export function ConversationUI() {
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">ROSLYN Ai</h1>
+            <h1 className="text-lg font-semibold text-gray-900">Syntax AI Architect</h1>
             <p className={`text-sm ${getPhaseColor(context.currentPhase)} font-medium`}>
               {getPhaseDescription(context.currentPhase)}
             </p>
@@ -288,7 +293,7 @@ export function ConversationUI() {
         {requirements.length > 0 && !projectStructure && !isGeneratingStructure && (
           <div className="p-4 border-b border-gray-200">
             <button
-              onClick={generateProjectStructure}
+              onClick={generateArchitectLevel1}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2.5 flex items-center justify-center transition-colors"
             >
               <FolderIcon className="w-4 h-4 mr-2" />
@@ -297,6 +302,29 @@ export function ConversationUI() {
           </div>
         )}
       </div>
+
+      {/* Architect Output */}
+      <ArchitectOutput
+        level1Output={architect.level1Output}
+        level2Output={architect.level2Output}
+        level3Output={architect.level3Output}
+        currentLevel={architect.currentLevel}
+        isThinking={architect.isThinking}
+        error={architect.error}
+        onProceedToNextLevel={() => {
+          switch (architect.currentLevel) {
+            case 1:
+              generateArchitectLevel2();
+              break;
+            case 2:
+              generateArchitectLevel3();
+              break;
+            case 3:
+              generateProjectStructure(architect.level3Output!);
+              break;
+          }
+        }}
+      />
     </div>
   );
 }

@@ -1,10 +1,18 @@
+#!/bin/bash
+
+# Create backup
+echo "Creating backup..."
+cp src/components/conversation/ConversationUI.tsx ./backups/ConversationUI.tsx.bak 2>/dev/null || true
+
+# Update the ConversationUI component
+echo "Updating ConversationUI component..."
+cat > src/components/conversation/ConversationUI.tsx << 'EOF'
 "use client";
 
 import { useRef, useEffect, useState } from 'react';
 import { useConversationStore } from '../../lib/stores/conversation';
 import { ProjectStructure } from './ProjectStructure';
 import { ArchitectOutput } from './ArchitectOutput';
-import { useConversationStore } from '../../lib/stores/conversation';
 import { FolderIcon } from 'lucide-react';
 
 export function ConversationUI() {
@@ -17,9 +25,10 @@ export function ConversationUI() {
     reset,
     projectStructure,
     isGeneratingStructure,
-    architectOutput,
-    isArchitectThinking,
-    generateArchitectOutput,
+    architect,
+    generateArchitectLevel1,
+    generateArchitectLevel2,
+    generateArchitectLevel3,
     generateProjectStructure
   } = useConversationStore();
 
@@ -290,10 +299,10 @@ export function ConversationUI() {
         )}
 
         {/* Architect Button */}
-        {requirements.length > 0 && !architectOutput && !isArchitectThinking && (
+        {requirements.length > 0 && !architect.level1Output && !architect.isThinking && (
           <div className="p-4 border-b border-gray-200">
             <button
-              onClick={generateArchitectOutput}
+              onClick={generateArchitectLevel1}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2.5 flex items-center justify-center transition-colors"
             >
               <FolderIcon className="w-4 h-4 mr-2" />
@@ -305,27 +314,27 @@ export function ConversationUI() {
 
       {/* Architect Output */}
       <ArchitectOutput
-        architectOutput={architectOutput}
-        onPassToConstructor={() => architectOutput && generateProjectStructure(architectOutput)}
-        isLoading={isArchitectThinking}
+        level1Output={architect.level1Output}
+        level2Output={architect.level2Output}
+        level3Output={architect.level3Output}
+        currentLevel={architect.currentLevel}
+        isThinking={architect.isThinking}
+        error={architect.error}
+        onProceedToNextLevel={() => {
+          switch (architect.currentLevel) {
+            case 1:
+              generateArchitectLevel2();
+              break;
+            case 2:
+              generateArchitectLevel3();
+              break;
+            case 3:
+              generateProjectStructure(architect.level3Output!);
+              break;
+          }
+        }}
       />
     </div>
   );
 }
-
-export function getMetricDescription(metric: string): string {
-  switch (metric) {
-    case 'coreConcept':
-      return 'Understanding of the main project idea and its core functionality';
-    case 'requirements':
-      return 'Clarity of functional requirements and system capabilities';
-    case 'technical':
-      return 'Understanding of technical needs, architecture, and implementation details';
-    case 'constraints':
-      return 'Understanding of limitations, performance requirements, and system boundaries';
-    case 'userContext':
-      return 'Understanding of user needs, business context, and organizational requirements';
-    default:
-      return '';
-  }
-}
+EOF

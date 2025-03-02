@@ -2,25 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { requirements, architectVision, folderStructure, implementationPlan } = await req.json();
+    const { requirements, architectOutput } = await req.json();
 
     if (!requirements || !Array.isArray(requirements)) {
       return NextResponse.json({ error: 'Valid requirements array is required' }, { status: 400 });
     }
 
-    const systemPrompt = `You are an experienced software architect tasked with creating a project structure. Based on the provided requirements, architectural vision, folder structure, and implementation plan, generate a comprehensive project structure that follows best practices.
+    const systemPrompt = `You are an experienced software architect tasked with creating a project structure. Based on the provided requirements and architectural vision, generate a comprehensive project structure that follows best practices.
 
 Requirements:
 ${requirements.join('\n')}
 
 Architectural Vision:
-${architectVision || 'No architectural vision provided.'}
+${architectOutput || 'No additional architectural guidance provided.'}
 
-Folder Structure:
-${JSON.stringify(folderStructure || {}, null, 2)}
-
-Implementation Plan:
-${JSON.stringify(implementationPlan || {}, null, 2)}
+Create a detailed project structure that:
+1. Follows the architectural vision
+2. Implements all requirements effectively
+3. Uses modern best practices
+4. Is maintainable and scalable
+5. Includes clear organization of components
 
 Respond with ONLY a JSON object in this format:
 {
@@ -61,8 +62,6 @@ Respond with ONLY a JSON object in this format:
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Claude API error:', errorText);
       throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
     }
 
@@ -71,14 +70,15 @@ Respond with ONLY a JSON object in this format:
     if (!data.content || !data.content[0] || !data.content[0].text) {
       throw new Error('Invalid response format from Claude API');
     }
-    
-    const cleanText = data.content[0].text
-      .replace(/^```json\s*|\s*```$/g, '')
-      .replace(/^`|`$/g, '')
-      .replace(/[\n\r\t]/g, ' ')
-      .replace(/\s+/g, ' ');
-    
-    const structureResponse = JSON.parse(cleanText);
+
+    let structureResponse;
+    try {
+      structureResponse = JSON.parse(data.content[0].text);
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      console.error('Failed to parse structure response:', error);
+      throw new Error(`Failed to parse structure response: ${error.message}`);
+    }
 
     return NextResponse.json(structureResponse);
   } catch (error) {

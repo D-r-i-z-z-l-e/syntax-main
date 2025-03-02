@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { architectService } from '../../../lib/services/architect.service';
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { level, requirements, visionText, folderStructure } = body;
     
-    console.log(`Architect API level ${level} request received`);
+    // Add detailed logging
+    console.log('Architect API request:', {
+      level,
+      requirementsLength: requirements?.length,
+      hasVisionText: !!visionText,
+      hasFolderStructure: !!folderStructure,
+      folderStructureDetails: folderStructure ? 
+        {
+          hasRootFolder: !!folderStructure.rootFolder,
+          rootFolderName: folderStructure.rootFolder?.name
+        } : 'No folder structure'
+    });
     
     if (!requirements || !Array.isArray(requirements)) {
+      console.error('Missing requirements array');
       return NextResponse.json({ error: 'Valid requirements array is required' }, { status: 400 });
     }
     
@@ -19,42 +30,39 @@ export async function POST(req: NextRequest) {
         break;
       case 2:
         if (!visionText) {
+          console.error('Missing vision text for level 2');
           return NextResponse.json({ error: 'Vision text is required for level 2' }, { status: 400 });
         }
         result = await architectService.generateLevel2(requirements, visionText);
         break;
       case 3:
         if (!visionText) {
+          console.error('Missing vision text for level 3');
           return NextResponse.json({ error: 'Vision text is required for level 3' }, { status: 400 });
         }
         
-        // Special debug for level 3
-        console.log('Level 3 folderStructure debugging:');
-        console.log('folderStructure received:', JSON.stringify(folderStructure));
-        console.log('Type:', typeof folderStructure);
+        console.log('Level 3 folderStructure check:', {
+          folderStructure: JSON.stringify(folderStructure, null, 2),
+          type: typeof folderStructure,
+          hasRootFolder: folderStructure && typeof folderStructure === 'object' && 'rootFolder' in folderStructure
+        });
         
-        // Check for rootFolder - this is the key check
-        if (!folderStructure || typeof folderStructure !== 'object') {
-          return NextResponse.json({ error: 'Missing required input for level 3: folder structure (no object)' }, { status: 400 });
+        if (!folderStructure || !folderStructure.rootFolder) {
+          console.error('Missing folder structure for level 3', { folderStructure });
+          return NextResponse.json({ error: 'Missing required input for level 3: folder structure' }, { status: 400 });
         }
         
-        if (!('rootFolder' in folderStructure)) {
-          return NextResponse.json({ error: 'Missing required input for level 3: folder structure (no rootFolder)' }, { status: 400 });
-        }
-        
-        // Wrap folderStructure if needed
-        let processedStructure = folderStructure;
-        if (folderStructure.rootFolder) {
-          processedStructure = { rootFolder: folderStructure.rootFolder };
-        }
-        
-        console.log('Using folderStructure:', JSON.stringify(processedStructure));
-        
-        result = await architectService.generateLevel3(requirements, visionText, processedStructure);
+        result = await architectService.generateLevel3(requirements, visionText, folderStructure);
         break;
       default:
+        console.error('Invalid architect level:', level);
         return NextResponse.json({ error: 'Invalid architect level' }, { status: 400 });
     }
+    
+    console.log('Architect API success result:', { 
+      resultType: typeof result,
+      hasResult: !!result 
+    });
     
     return NextResponse.json(result);
   } catch (error) {

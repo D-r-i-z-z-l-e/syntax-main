@@ -1,0 +1,42 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { architectService } from '../../../lib/services/architect.service';
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { level, requirements, visionText, folderStructure } = body;
+
+    if (!requirements || !Array.isArray(requirements)) {
+      return NextResponse.json({ error: 'Valid requirements array is required' }, { status: 400 });
+    }
+
+    let result;
+    switch (level) {
+      case 1:
+        result = await architectService.generateLevel1(requirements);
+        break;
+      case 2:
+        if (!visionText) {
+          return NextResponse.json({ error: 'Vision text is required for level 2' }, { status: 400 });
+        }
+        result = await architectService.generateLevel2(requirements, visionText);
+        break;
+      case 3:
+        if (!visionText || !folderStructure) {
+          return NextResponse.json({ error: 'Vision text and folder structure are required for level 3' }, { status: 400 });
+        }
+        result = await architectService.generateLevel3(requirements, visionText, folderStructure);
+        break;
+      default:
+        return NextResponse.json({ error: 'Invalid architect level' }, { status: 400 });
+    }
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Error in architect API:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to generate architect output' },
+      { status: 500 }
+    );
+  }
+}

@@ -21,20 +21,6 @@ export function ArchitectOutput({
   error,
   onProceedToNextLevel
 }: ArchitectOutputProps) {
-  // Debug logging to check what data is actually available
-  console.log('ArchitectOutput rendering with:', {
-    hasLevel1: !!level1Output,
-    hasLevel2: !!level2Output,
-    hasLevel3: !!level3Output,
-    currentLevel,
-    isThinking,
-    error
-  });
-  
-  if (level2Output) {
-    console.log('Level2Output data structure:', JSON.stringify(level2Output));
-  }
-
   const getButtonText = () => {
     switch (currentLevel) {
       case 1:
@@ -45,20 +31,6 @@ export function ArchitectOutput({
         return 'Generate Project Structure';
       default:
         return 'Proceed';
-    }
-  };
-
-  // Check if we have the required data to proceed to next level
-  const canProceedToNextLevel = () => {
-    switch (currentLevel) {
-      case 1:
-        return !!level1Output?.visionText;
-      case 2:
-        return !!level2Output?.rootFolder;
-      case 3:
-        return !!level3Output?.implementationOrder;
-      default:
-        return false;
     }
   };
 
@@ -107,7 +79,7 @@ export function ArchitectOutput({
                 Project Structure
               </h3>
               <div className="bg-gray-50 rounded-lg p-3 max-h-[300px] overflow-y-auto">
-                {level2Output.rootFolder && renderFolderStructure(level2Output.rootFolder)}
+                {renderFolderStructure(level2Output.rootFolder)}
               </div>
             </div>
           )}
@@ -132,11 +104,7 @@ export function ArchitectOutput({
 
           <button
             onClick={onProceedToNextLevel}
-            disabled={!canProceedToNextLevel()}
-            className={`mt-4 w-full ${canProceedToNextLevel() 
-              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            } font-medium rounded-lg px-4 py-2.5 flex items-center justify-center transition-colors`}
+            className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2.5 flex items-center justify-center transition-colors"
           >
             <ArrowRightIcon className="w-4 h-4 mr-2" />
             {getButtonText()}
@@ -148,11 +116,6 @@ export function ArchitectOutput({
 }
 
 function renderFolderStructure(folder: ArchitectLevel2['rootFolder'], depth = 0) {
-  if (!folder) {
-    console.error('Trying to render null/undefined folder structure');
-    return <div className="text-red-500">Error: Invalid folder structure</div>;
-  }
-  
   return (
     <div className={`${depth > 0 ? 'ml-4' : ''}`}>
       <div className="flex items-start gap-2">
