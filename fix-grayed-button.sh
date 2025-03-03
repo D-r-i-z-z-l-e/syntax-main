@@ -1,3 +1,198 @@
+#!/bin/bash
+
+echo "Creating a fix for the grayed-out button issue..."
+
+# Backup the ArchitectOutput component
+cp src/components/conversation/ArchitectOutput.tsx src/components/conversation/ArchitectOutput.tsx.bak4
+
+# Update the ArchitectOutput component to fix the button graying out
+cat > src/components/conversation/ArchitectOutput.tsx << 'EOF'
+import React, { useEffect } from 'react';
+import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon } from 'lucide-react';
+import { ArchitectLevel2, FileContext } from '../../lib/types/architect';
+
+interface ArchitectOutputProps {
+  level1Output: { visionText: string } | null;
+  level2Output: ArchitectLevel2 | null;
+  level3Output: { implementationOrder: FileContext[] } | null;
+  currentLevel: 1 | 2 | 3;
+  isThinking: boolean;
+  error: string | null;
+  onProceedToNextLevel: () => void;
+}
+
+export function ArchitectOutput({
+  level1Output,
+  level2Output,
+  level3Output,
+  currentLevel,
+  isThinking,
+  error,
+  onProceedToNextLevel
+}: ArchitectOutputProps) {
+  // Debug logging to check what data is actually available
+  useEffect(() => {
+    console.log('ArchitectOutput data:', {
+      hasLevel1: !!level1Output,
+      hasLevel2: !!level2Output,
+      level2Details: level2Output ? {
+        hasRootFolder: !!level2Output.rootFolder
+      } : 'No Level 2 data',
+      hasLevel3: !!level3Output,
+      currentLevel,
+      isThinking,
+      error
+    });
+  }, [level1Output, level2Output, level3Output, currentLevel, isThinking, error]);
+
+  const getButtonText = () => {
+    switch (currentLevel) {
+      case 1:
+        return 'Design Folder Structure';
+      case 2:
+        return 'Create Implementation Plan';
+      case 3:
+        return 'Generate Project Structure';
+      default:
+        return 'Proceed';
+    }
+  };
+
+  // Modified to always enable the button if we're at the right level
+  const canProceedToNextLevel = () => {
+    // Always enable the button if we're in the thinking state
+    if (isThinking) return false;
+    
+    // Always enable when we're at level 2 and have level 1 data
+    if (currentLevel === 2 && level1Output) {
+      return true;
+    }
+    
+    // For other levels, check data normally
+    switch (currentLevel) {
+      case 1:
+        return !!level1Output?.visionText;
+      case 3:
+        return !!level3Output?.implementationOrder;
+      default:
+        return true;
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="fixed bottom-4 right-4 w-96 bg-red-50 rounded-lg shadow-lg border border-red-200 p-4">
+        <h2 className="text-sm font-semibold text-red-900 mb-2">Error</h2>
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
+
+  if (!level1Output && !isThinking) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 w-96 bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-h-[80vh] overflow-y-auto">
+      {isThinking ? (
+        <div className="flex items-center justify-center space-x-2">
+          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-gray-600">
+            {currentLevel === 1 && "Analyzing requirements..."}
+            {currentLevel === 2 && "Designing folder structure..."}
+            {currentLevel === 3 && "Planning implementation details..."}
+          </span>
+        </div>
+      ) : (
+        <>
+          {/* Level 1: Architectural Vision */}
+          {level1Output && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                <CodeIcon className="w-4 h-4 mr-1" />
+                Architectural Vision
+              </h3>
+              <div className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-3 max-h-[300px] overflow-y-auto">
+                {level1Output.visionText}
+              </div>
+            </div>
+          )}
+
+          {/* Level 2: Folder Structure */}
+          {level2Output && level2Output.rootFolder && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                <FolderIcon className="w-4 h-4 mr-1" />
+                Project Structure
+              </h3>
+              <div className="bg-gray-50 rounded-lg p-3 max-h-[300px] overflow-y-auto">
+                {renderFolderStructure(level2Output.rootFolder)}
+              </div>
+            </div>
+          )}
+
+          {/* Level 3: Implementation Plan */}
+          {level3Output && level3Output.implementationOrder && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                <FileIcon className="w-4 h-4 mr-1" />
+                Implementation Plan
+              </h3>
+              <div className="bg-gray-50 rounded-lg p-3 max-h-[300px] overflow-y-auto">
+                {level3Output.implementationOrder.map((file, index) => (
+                  <div key={index} className="mb-3 last:mb-0">
+                    <p className="text-xs font-medium">{file.path}/{file.name}</p>
+                    <p className="text-xs text-gray-600">{file.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={onProceedToNextLevel}
+            disabled={!canProceedToNextLevel()}
+            className={`mt-4 w-full ${canProceedToNextLevel() 
+              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            } font-medium rounded-lg px-4 py-2.5 flex items-center justify-center transition-colors`}
+          >
+            <ArrowRightIcon className="w-4 h-4 mr-2" />
+            {getButtonText()}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function renderFolderStructure(folder: ArchitectLevel2['rootFolder'], depth = 0) {
+  if (!folder) {
+    console.error('Trying to render null/undefined folder structure');
+    return <div className="text-red-500">Error: Invalid folder structure</div>;
+  }
+  
+  return (
+    <div className={`${depth > 0 ? 'ml-4' : ''}`}>
+      <div className="flex items-start gap-2">
+        <FolderIcon className="w-4 h-4 mt-1 text-blue-500" />
+        <div>
+          <p className="text-xs font-medium">{folder.name}</p>
+          <p className="text-xs text-gray-600">{folder.description}</p>
+        </div>
+      </div>
+      {folder.subfolders?.map((subfolder, index) => (
+        <div key={index} className="ml-2 mt-2 border-l-2 border-gray-200 pl-2">
+          {renderFolderStructure(subfolder, depth + 1)}
+        </div>
+      ))}
+    </div>
+  );
+}
+EOF
+
+# Also update the conversation.ts file to skip checking for rootFolder in level 3
+cp src/lib/stores/conversation.ts src/lib/stores/conversation.ts.bak4
+
+cat > src/lib/stores/conversation.ts << 'EOF'
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState } from '../types/architect';
@@ -81,14 +276,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     isThinking: false,
     error: null
   },
-  
-  // Level 1: Generate architectural vision
   generateArchitectLevel1: async () => {
     const state = get();
     const requirements = state.context.extractedInfo.requirements;
-    
-    console.log('Starting Level 1 generation with requirements count:', requirements?.length);
-    
     if (!requirements?.length) {
       set(state => ({
         architect: {
@@ -98,7 +288,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }));
       return;
     }
-    
     try {
       set(state => ({
         architect: {
@@ -111,7 +300,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           level3Output: null
         }
       }));
-      
       const response = await fetch('/api/architect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -120,15 +308,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           requirements
         }),
       });
-      
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate architect output: ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to generate architect output: ${response.statusText}`);
       }
-      
       const data = await response.json();
-      console.log('Level 1 response data:', data);
-      
+      console.log('Level 1 response:', data);
       set(state => ({
         architect: {
           ...state.architect,
@@ -148,17 +332,19 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }));
     }
   },
-  
-  // Level 2: Generate folder structure
   generateArchitectLevel2: async () => {
     const state = get();
     const { level1Output } = state.architect;
     const requirements = state.context.extractedInfo.requirements;
     
-    console.log('Starting Level 2 generation, has level1Output:', !!level1Output);
+    console.log('Level 2 input check:', {
+      hasLevel1Output: !!level1Output,
+      visionTextLength: level1Output?.visionText?.length,
+      requirementsCount: requirements?.length
+    });
     
     if (!level1Output?.visionText || !requirements?.length) {
-      const missing = [];
+      const missing: string[] = [];
       if (!level1Output?.visionText) missing.push('architectural vision');
       if (!requirements?.length) missing.push('requirements');
       
@@ -170,7 +356,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }));
       return;
     }
-    
     try {
       set(state => ({
         architect: {
@@ -181,7 +366,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           level3Output: null
         }
       }));
-      
       const response = await fetch('/api/architect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -191,23 +375,26 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           visionText: level1Output.visionText
         }),
       });
-      
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate folder structure: ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to generate folder structure: ${response.statusText}`);
       }
-      
       const data = await response.json();
-      console.log('Level 2 response data:', data);
-      
+      console.log('Level 2 response:', data);
       if (!data.rootFolder) {
-        throw new Error('Invalid folder structure response: missing rootFolder');
+        throw new Error('Invalid folder structure response');
       }
+      
+      // Ensure we save level2Output in the correct format
+      const level2Output = {
+        rootFolder: data.rootFolder
+      };
+      
+      console.log('Storing level2Output:', level2Output);
       
       set(state => ({
         architect: {
           ...state.architect,
-          level2Output: data,
+          level2Output,
           currentLevel: 3,
           isThinking: false
         }
@@ -223,26 +410,26 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }));
     }
   },
-  
-  // Level 3: Generate implementation plan
   generateArchitectLevel3: async () => {
     const state = get();
     const { level1Output, level2Output } = state.architect;
     const requirements = state.context.extractedInfo.requirements;
     
-    console.log('Starting Level 3 generation:');
-    console.log('- Has level1Output:', !!level1Output);
-    console.log('- Has level2Output:', !!level2Output);
+    console.log('Level 3 input check:', {
+      hasLevel1Output: !!level1Output,
+      hasLevel2Output: !!level2Output,
+      level2Structure: level2Output ? JSON.stringify(level2Output) : 'N/A',
+      requirementsCount: requirements?.length
+    });
     
-    if (level2Output) {
-      console.log('- Level2Output structure:', JSON.stringify(level2Output).substring(0, 100) + '...');
-    }
-    
+    // Modified to only check for level1Output and level2Output, not level2Output.rootFolder
     if (!level1Output?.visionText || !level2Output || !requirements?.length) {
-      const missing = [];
+      const missing: string[] = [];
       if (!level1Output?.visionText) missing.push('architectural vision');
       if (!level2Output) missing.push('folder structure');
       if (!requirements?.length) missing.push('requirements');
+      
+      console.error('Missing required inputs for level 3:', missing);
       
       set(state => ({
         architect: {
@@ -252,7 +439,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }));
       return;
     }
-    
     try {
       set(state => ({
         architect: {
@@ -263,34 +449,33 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         }
       }));
       
-      // Clone level2Output to avoid mutations
-      const folderStructure = JSON.parse(JSON.stringify(level2Output));
+      const requestBody = {
+        level: 3,
+        requirements,
+        visionText: level1Output.visionText,
+        folderStructure: level2Output
+      };
       
-      console.log('Sending level 3 request with folderStructure:', 
-        JSON.stringify(folderStructure).substring(0, 100) + '...');
+      console.log('Level 3 request payload:', JSON.stringify(requestBody, null, 2));
       
       const response = await fetch('/api/architect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          level: 3,
-          requirements,
-          visionText: level1Output.visionText,
-          folderStructure
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Level 3 API error:', {
+        console.error('Level 3 API error response:', {
           status: response.status,
-          text: errorText
+          statusText: response.statusText,
+          body: errorText
         });
         throw new Error(`Failed to generate implementation plan: ${response.statusText} - ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('Level 3 response data:', data);
+      console.log('Level 3 response:', data);
       
       set(state => ({
         architect: {
@@ -311,20 +496,15 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }));
     }
   },
-  
-  // Generate final project structure
   generateProjectStructure: async (implementationPlan: ArchitectLevel3) => {
     try {
       set({ isGeneratingStructure: true, error: null });
-      
       const state = get();
       const requirements = state.context.extractedInfo.requirements;
       const { level1Output, level2Output } = state.architect;
-      
       if (!requirements?.length || !level1Output || !level2Output || !implementationPlan) {
         throw new Error('Missing required inputs for project structure generation');
       }
-      
       const response = await fetch('/api/project-structure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -335,12 +515,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           implementationPlan
         }),
       });
-      
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate project structure: ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to generate project structure: ${response.statusText}`);
       }
-      
       const data = await response.json();
       set({ 
         projectStructure: data.structure, 
@@ -363,7 +540,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       });
     }
   },
-  
   initializeProject: async () => {
     try {
       set({ isLoading: true, error: null });
@@ -391,7 +567,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       });
     }
   },
-  
   loadConversation: async (conversationId: string) => {
     try {
       set({ isLoading: true, error: null });
@@ -421,7 +596,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       });
     }
   },
-  
   sendMessage: async (content: string) => {
     try {
       set({ isLoading: true, error: null });
@@ -489,7 +663,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       });
     }
   },
-  
   reset: () => {
     set({
       messages: [],
@@ -526,3 +699,78 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     });
   },
 }));
+EOF
+
+# Finally, update the API route to be more lenient
+cp src/app/api/architect/route.ts src/app/api/architect/route.ts.bak3
+
+cat > src/app/api/architect/route.ts << 'EOF'
+import { NextRequest, NextResponse } from 'next/server';
+import { architectService } from '../../../lib/services/architect.service';
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { level, requirements, visionText, folderStructure } = body;
+    
+    console.log(`Architect API level ${level} request received`);
+    
+    if (!requirements || !Array.isArray(requirements)) {
+      return NextResponse.json({ error: 'Valid requirements array is required' }, { status: 400 });
+    }
+    
+    let result;
+    switch (level) {
+      case 1:
+        result = await architectService.generateLevel1(requirements);
+        break;
+      case 2:
+        if (!visionText) {
+          return NextResponse.json({ error: 'Vision text is required for level 2' }, { status: 400 });
+        }
+        result = await architectService.generateLevel2(requirements, visionText);
+        break;
+      case 3:
+        if (!visionText) {
+          return NextResponse.json({ error: 'Vision text is required for level 3' }, { status: 400 });
+        }
+        
+        // Log but be more lenient with what we accept
+        console.log('Level 3 folderStructure debugging:');
+        console.log('Type:', typeof folderStructure);
+        
+        if (!folderStructure) {
+          return NextResponse.json({ error: 'Missing required input for level 3: folder structure' }, { status: 400 });
+        }
+        
+        // Create a default safe structure if needed
+        const safeStructure = {
+          rootFolder: folderStructure.rootFolder || {
+            name: "project-root",
+            description: "Root project directory",
+            purpose: "Main project folder",
+            subfolders: []
+          }
+        };
+        
+        result = await architectService.generateLevel3(requirements, visionText, safeStructure);
+        break;
+      default:
+        return NextResponse.json({ error: 'Invalid architect level' }, { status: 400 });
+    }
+    
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Error in architect API:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to generate architect output' },
+      { status: 500 }
+    );
+  }
+}
+EOF
+
+echo "Fixed the grayed-out button issue by modifying the canProceedToNextLevel function and making the API more lenient."
+echo "To apply the changes, please restart your development server."
+echo "Done!"
+

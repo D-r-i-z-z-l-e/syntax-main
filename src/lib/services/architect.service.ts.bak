@@ -20,21 +20,19 @@ class ArchitectService {
   }
 
   private cleanJsonString(str: string): string {
-    // Remove any markdown code block indicators
     str = str.replace(/^```json\s*|\s*```$/g, '');
     str = str.replace(/^`|`$/g, '');
     
-    // Handle escape sequences and control characters
-    str = str.replace(/[\n\r\t]/g, ' '); // Replace newlines, returns, tabs with space
-    str = str.replace(/\s+/g, ' '); // Collapse multiple spaces
-    str = str.replace(/\\([^"\\\/bfnrt])/g, '$1'); // Remove invalid escape sequences
+    str = str.replace(/[\n\r\t]/g, ' ');
+    str = str.replace(/\s+/g, ' ');
+    str = str.replace(/\\([^"\\\/bfnrt])/g, '$1');
     
     return str;
   }
 
   private async callClaude(systemPrompt: string, userMessage: string) {
-    console.log('Calling Claude with system prompt:', systemPrompt);
-    console.log('User message:', userMessage);
+    console.log('Calling Claude with system prompt:', systemPrompt.substring(0, 500) + '...');
+    console.log('User message:', userMessage.substring(0, 200) + '...');
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -67,31 +65,32 @@ class ArchitectService {
 
     try {
       const cleanedText = this.cleanJsonString(data.content[0].text);
-      console.log('Cleaned response:', cleanedText);
+      console.log('Cleaned response:', cleanedText.substring(0, 200) + '...');
       const parsedResponse = JSON.parse(cleanedText);
-      console.log('Parsed response:', parsedResponse);
+      console.log('Parsed response:', JSON.stringify(parsedResponse).substring(0, 200) + '...');
       return parsedResponse;
     } catch (e) {
       console.error('Failed to parse Claude response:', {
         error: e,
-        rawResponse: data.content[0].text,
-        cleanedResponse: this.cleanJsonString(data.content[0].text)
+        rawResponse: data.content[0].text.substring(0, 200) + '...',
+        cleanedResponse: this.cleanJsonString(data.content[0].text).substring(0, 200) + '...'
       });
       throw new Error(`Failed to parse Claude response: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   async generateLevel1(requirements: string[]): Promise<ArchitectLevel1> {
+    console.log('Generating level 1 with requirements:', requirements);
     const systemPrompt = `You are an expert software architect. Create a comprehensive architectural vision.
 IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
 {
   "visionText": "Your detailed architectural vision here"
 }`;
-
     return this.callClaude(systemPrompt, `Requirements:\n${requirements.join('\n')}`);
   }
 
   async generateLevel2(requirements: string[], visionText: string): Promise<ArchitectLevel2> {
+    console.log('Generating level 2 with vision text and requirements');
     const systemPrompt = `You are an expert software architect. Create a folder structure based on the requirements and vision.
 IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
 {
@@ -109,19 +108,22 @@ IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
     ]
   }
 }`;
-
     const response = await this.callClaude(systemPrompt, `
 Requirements:
 ${requirements.join('\n')}
-
 Architectural Vision:
 ${visionText}`);
-
+    
+    console.log('Level 2 response structure check:', {
+      hasRootFolder: 'rootFolder' in response,
+      rootFolderType: typeof response.rootFolder,
+      rootFolderKeys: response.rootFolder ? Object.keys(response.rootFolder) : 'N/A'
+    });
+    
     if (!response.rootFolder) {
       console.error('Invalid folder structure response:', response);
       throw new Error('Invalid folder structure response: missing rootFolder');
     }
-
     return response;
   }
 
@@ -130,6 +132,9 @@ ${visionText}`);
     visionText: string,
     folderStructure: ArchitectLevel2
   ): Promise<ArchitectLevel3> {
+    console.log('Generating level 3 with folder structure');
+    console.log('Folder structure for level 3:', JSON.stringify(folderStructure).substring(0, 200) + '...');
+    
     const systemPrompt = `You are an expert software architect. Create a detailed implementation plan.
 IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
 {
@@ -155,22 +160,25 @@ IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
     }
   ]
 }`;
-
     const response = await this.callClaude(systemPrompt, `
 Requirements:
 ${requirements.join('\n')}
-
 Architectural Vision:
 ${visionText}
-
 Folder Structure:
 ${JSON.stringify(folderStructure, null, 2)}`);
-
+    
+    console.log('Level 3 response structure check:', {
+      hasImplementationOrder: 'implementationOrder' in response,
+      implementationOrderType: typeof response.implementationOrder,
+      isArray: Array.isArray(response.implementationOrder),
+      length: response.implementationOrder ? response.implementationOrder.length : 0
+    });
+    
     if (!response.implementationOrder || !Array.isArray(response.implementationOrder)) {
       console.error('Invalid implementation plan response:', response);
       throw new Error('Invalid implementation plan response: missing or invalid implementationOrder');
     }
-
     return response;
   }
 }

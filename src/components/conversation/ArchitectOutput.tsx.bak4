@@ -21,13 +21,15 @@ export function ArchitectOutput({
   error,
   onProceedToNextLevel
 }: ArchitectOutputProps) {
-  // Debug logging
+  // Debug logging to check what data is actually available
   useEffect(() => {
-    console.log('ArchitectOutput component rendered with:', {
-      level1: !!level1Output,
-      level2: !!level2Output,
-      level2Details: level2Output ? `Has rootFolder: ${!!level2Output.rootFolder}` : 'No level2Output',
-      level3: !!level3Output,
+    console.log('ArchitectOutput data:', {
+      hasLevel1: !!level1Output,
+      hasLevel2: !!level2Output,
+      level2Details: level2Output ? {
+        hasRootFolder: !!level2Output.rootFolder
+      } : 'No Level 2 data',
+      hasLevel3: !!level3Output,
       currentLevel,
       isThinking,
       error
@@ -47,9 +49,25 @@ export function ArchitectOutput({
     }
   };
 
-  // Always enabled for testing - this ensures we can proceed
+  // Modified to always enable the button if we're at the right level
   const canProceedToNextLevel = () => {
-    return !isThinking;
+    // Always enable the button if we're in the thinking state
+    if (isThinking) return false;
+    
+    // Always enable when we're at level 2 and have level 1 data
+    if (currentLevel === 2 && level1Output) {
+      return true;
+    }
+    
+    // For other levels, check data normally
+    switch (currentLevel) {
+      case 1:
+        return !!level1Output?.visionText;
+      case 3:
+        return !!level3Output?.implementationOrder;
+      default:
+        return true;
+    }
   };
 
   if (error) {
@@ -137,7 +155,7 @@ export function ArchitectOutput({
   );
 }
 
-function renderFolderStructure(folder: any, depth = 0) {
+function renderFolderStructure(folder: ArchitectLevel2['rootFolder'], depth = 0) {
   if (!folder) {
     console.error('Trying to render null/undefined folder structure');
     return <div className="text-red-500">Error: Invalid folder structure</div>;
@@ -152,7 +170,7 @@ function renderFolderStructure(folder: any, depth = 0) {
           <p className="text-xs text-gray-600">{folder.description}</p>
         </div>
       </div>
-      {folder.subfolders?.map((subfolder: any, index: number) => (
+      {folder.subfolders?.map((subfolder, index) => (
         <div key={index} className="ml-2 mt-2 border-l-2 border-gray-200 pl-2">
           {renderFolderStructure(subfolder, depth + 1)}
         </div>

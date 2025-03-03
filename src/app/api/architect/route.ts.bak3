@@ -7,12 +7,6 @@ export async function POST(req: NextRequest) {
     const { level, requirements, visionText, folderStructure } = body;
     
     console.log(`Architect API level ${level} request received`);
-    console.log(`Request body:`, JSON.stringify({
-      level,
-      requirementsCount: requirements?.length,
-      hasVisionText: !!visionText,
-      hasFolderStructure: !!folderStructure,
-    }));
     
     if (!requirements || !Array.isArray(requirements)) {
       return NextResponse.json({ error: 'Valid requirements array is required' }, { status: 400 });
@@ -34,18 +28,25 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Vision text is required for level 3' }, { status: 400 });
         }
         
+        // Log but be more lenient with what we accept
+        console.log('Level 3 folderStructure debugging:');
+        console.log('Type:', typeof folderStructure);
+        
         if (!folderStructure) {
           return NextResponse.json({ error: 'Missing required input for level 3: folder structure' }, { status: 400 });
         }
         
-        // Make sure folderStructure has the expected format
-        const normalizedFolderStructure = folderStructure.rootFolder 
-          ? folderStructure 
-          : { rootFolder: folderStructure };
-          
-        console.log('Using normalized folder structure:', JSON.stringify(normalizedFolderStructure).substring(0, 200) + '...');
+        // Create a default safe structure if needed
+        const safeStructure = {
+          rootFolder: folderStructure.rootFolder || {
+            name: "project-root",
+            description: "Root project directory",
+            purpose: "Main project folder",
+            subfolders: []
+          }
+        };
         
-        result = await architectService.generateLevel3(requirements, visionText, normalizedFolderStructure);
+        result = await architectService.generateLevel3(requirements, visionText, safeStructure);
         break;
       default:
         return NextResponse.json({ error: 'Invalid architect level' }, { status: 400 });

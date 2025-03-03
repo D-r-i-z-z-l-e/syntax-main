@@ -1,30 +1,39 @@
 import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3 } from '../types/architect';
+
 class ArchitectService {
   private static instance: ArchitectService;
   private readonly MODEL = 'claude-3-5-sonnet-latest';
   private apiKey: string;
+
   private constructor() {
     this.apiKey = process.env.CLAUDE_API_KEY || '';
     if (!this.apiKey) {
       throw new Error('CLAUDE_API_KEY environment variable is required');
     }
   }
+
   public static getInstance(): ArchitectService {
     if (!ArchitectService.instance) {
       ArchitectService.instance = new ArchitectService();
     }
     return ArchitectService.instance;
   }
+
   private cleanJsonString(str: string): string {
-        str = str.replace(/^```json\s*|\s*```$/g, '');
+    str = str.replace(/^```json\s*|\s*```$/g, '');
     str = str.replace(/^`|`$/g, '');
     
-        str = str.replace(/[\n\r\t]/g, ' ');     str = str.replace(/\s+/g, ' ');     str = str.replace(/\\([^"\\\/bfnrt])/g, '$1');     
+    str = str.replace(/[\n\r\t]/g, ' ');
+    str = str.replace(/\s+/g, ' ');
+    str = str.replace(/\\([^"\\\/bfnrt])/g, '$1');
+    
     return str;
   }
+
   private async callClaude(systemPrompt: string, userMessage: string) {
-    console.log('Calling Claude with system prompt:', systemPrompt);
-    console.log('User message:', userMessage);
+    console.log('Calling Claude with system prompt:', systemPrompt.substring(0, 500) + '...');
+    console.log('User message:', userMessage.substring(0, 200) + '...');
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -41,31 +50,35 @@ class ArchitectService {
         messages: [{ role: 'user', content: userMessage }]
       })
     });
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Claude API error response:', errorText);
       throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
     }
+
     const data = await response.json();
     
     if (!data.content || !data.content[0] || !data.content[0].text) {
       throw new Error('Invalid response format from Claude API');
     }
+
     try {
       const cleanedText = this.cleanJsonString(data.content[0].text);
-      console.log('Cleaned response:', cleanedText);
+      console.log('Cleaned response:', cleanedText.substring(0, 200) + '...');
       const parsedResponse = JSON.parse(cleanedText);
-      console.log('Parsed response:', parsedResponse);
+      console.log('Parsed response:', JSON.stringify(parsedResponse).substring(0, 200) + '...');
       return parsedResponse;
     } catch (e) {
       console.error('Failed to parse Claude response:', {
         error: e,
-        rawResponse: data.content[0].text,
-        cleanedResponse: this.cleanJsonString(data.content[0].text)
+        rawResponse: data.content[0].text.substring(0, 200) + '...',
+        cleanedResponse: this.cleanJsonString(data.content[0].text).substring(0, 200) + '...'
       });
       throw new Error(`Failed to parse Claude response: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+
   async generateLevel1(requirements: string[]): Promise<ArchitectLevel1> {
     console.log('Generating level 1 with requirements:', requirements);
     const systemPrompt = `You are an expert software architect. Create a comprehensive architectural vision.
@@ -75,8 +88,9 @@ IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
 }`;
     return this.callClaude(systemPrompt, `Requirements:\n${requirements.join('\n')}`);
   }
+
   async generateLevel2(requirements: string[], visionText: string): Promise<ArchitectLevel2> {
-    console.log('Generating level 2 with vision text:', visionText.substring(0, 100) + '...');
+    console.log('Generating level 2 with vision text and requirements');
     const systemPrompt = `You are an expert software architect. Create a folder structure based on the requirements and vision.
 IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
 {
@@ -112,12 +126,14 @@ ${visionText}`);
     }
     return response;
   }
+
   async generateLevel3(
     requirements: string[],
     visionText: string,
     folderStructure: ArchitectLevel2
   ): Promise<ArchitectLevel3> {
-    console.log('Generating level 3 with folder structure:', JSON.stringify(folderStructure, null, 2));
+    console.log('Generating level 3 with folder structure');
+    console.log('Folder structure for level 3:', JSON.stringify(folderStructure).substring(0, 200) + '...');
     
     const systemPrompt = `You are an expert software architect. Create a detailed implementation plan.
 IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
@@ -166,4 +182,5 @@ ${JSON.stringify(folderStructure, null, 2)}`);
     return response;
   }
 }
+
 export const architectService = ArchitectService.getInstance();
