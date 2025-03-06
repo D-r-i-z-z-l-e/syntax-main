@@ -3,19 +3,110 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #f8fafc;
+  --foreground: #334155;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --secondary: #64748b;
+  --accent: #f59e0b;
+  --border: #e2e8f0;
+  --card: #ffffff;
+  --input-bg: #ffffff;
+  --input-text: #1e293b;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --header-bg: #ffffff;
+  --footer-bg: #ffffff;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+textarea, 
+input[type="text"], 
+input[type="email"], 
+input[type="password"] {
+  color: var(--input-text) !important;
+}
+
+.card-shadow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.architect-card {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease-in-out;
+}
+
+.architect-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.progress-indicator {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.progress-indicator .step {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: white;
+  position: relative;
+  z-index: 10;
+}
+
+.progress-indicator .step.active {
+  background-color: var(--primary);
+}
+
+.progress-indicator .step.completed {
+  background-color: var(--success);
+}
+
+.progress-indicator .step.inactive {
+  background-color: var(--secondary);
+  opacity: 0.5;
+}
+
+.progress-indicator .line {
+  height: 2px;
+  flex: 1;
+  background-color: var(--border);
+}
+
+.progress-indicator .line.active {
+  background-color: var(--primary);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

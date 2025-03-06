@@ -99,7 +99,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Reset all architect outputs to ensure proper sequence
       set(state => ({
         architect: {
           ...state.architect,
@@ -129,16 +128,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const data = await response.json();
       console.log('Level 1 response data:', data);
       
-      if (!data.visionText) {
-        throw new Error('Invalid response from architect level 1: missing visionText');
-      }
-      
-      // After successful level 1, stay at level 1
       set(state => ({
         architect: {
           ...state.architect,
           level1Output: data,
-          currentLevel: 1,  // Stay at level 1 until user explicitly moves to level 2
+          currentLevel: 2,
           isThinking: false
         }
       }));
@@ -176,13 +170,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Mark as thinking and move to level 2
       set(state => ({
         architect: {
           ...state.architect,
           isThinking: true,
           error: null,
-          currentLevel: 2,  // Now we're working on level 2
           level2Output: null,
           level3Output: null
         }
@@ -210,25 +202,21 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error('Invalid folder structure response: missing rootFolder');
       }
       
-      // After successfully completing level 2, stay at level 2
       set(state => ({
         architect: {
           ...state.architect,
           level2Output: data,
-          currentLevel: 2,  // Stay at level 2 until user explicitly moves to level 3
+          currentLevel: 3,
           isThinking: false
         }
       }));
     } catch (error) {
       console.error('Error generating architect level 2:', error);
-      
-      // If error, go back to level 1
       set(state => ({
         architect: {
           ...state.architect,
           error: error instanceof Error ? error.message : 'Failed to generate folder structure',
-          isThinking: false,
-          currentLevel: 1  // Return to level 1 on error
+          isThinking: false
         }
       }));
     }
@@ -257,18 +245,16 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Mark as thinking and move to level 3
       set(state => ({
         architect: {
           ...state.architect,
           isThinking: true,
           error: null,
-          currentLevel: 3,  // Now we're working on level 3
           level3Output: null
         }
       }));
       
-      // Ensure the folder structure properly has a rootFolder property
+      // Ensure the folder structure explicitly has a rootFolder property
       let folderStructureToSend;
       
       if ('rootFolder' in level2Output && level2Output.rootFolder) {
@@ -297,11 +283,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       
       const data = await response.json();
       
-      if (!data.implementationOrder || !Array.isArray(data.implementationOrder)) {
-        throw new Error('Invalid implementation plan response: missing or invalid implementationOrder');
-      }
-      
-      // After successfully completing level 3, stay at level 3
       set(state => ({
         architect: {
           ...state.architect,
@@ -312,14 +293,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }));
     } catch (error) {
       console.error('Error generating architect level 3:', error);
-      
-      // If error, go back to level 2
       set(state => ({
         architect: {
           ...state.architect,
           error: error instanceof Error ? error.message : 'Failed to generate implementation plan',
-          isThinking: false,
-          currentLevel: 2  // Return to level 2 on error
+          isThinking: false
         }
       }));
     }

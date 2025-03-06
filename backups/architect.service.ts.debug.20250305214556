@@ -133,12 +133,7 @@ ${visionText}`);
     folderStructure: ArchitectLevel2
   ): Promise<ArchitectLevel3> {
     console.log('Generating level 3 with folder structure');
-    
-    // Validate folder structure before using
-    if (!folderStructure || !folderStructure.rootFolder) {
-      console.error('Invalid folderStructure provided to generateLevel3:', folderStructure);
-      throw new Error('Invalid folder structure: missing rootFolder property');
-    }
+    console.log('Folder structure for level 3:', JSON.stringify(folderStructure).substring(0, 200) + '...');
     
     const systemPrompt = `You are an expert software architect. Create a detailed implementation plan.
 IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
@@ -172,6 +167,13 @@ Architectural Vision:
 ${visionText}
 Folder Structure:
 ${JSON.stringify(folderStructure, null, 2)}`);
+    
+    console.log('Level 3 response structure check:', {
+      hasImplementationOrder: 'implementationOrder' in response,
+      implementationOrderType: typeof response.implementationOrder,
+      isArray: Array.isArray(response.implementationOrder),
+      length: response.implementationOrder ? response.implementationOrder.length : 0
+    });
     
     if (!response.implementationOrder || !Array.isArray(response.implementationOrder)) {
       console.error('Invalid implementation plan response:', response);

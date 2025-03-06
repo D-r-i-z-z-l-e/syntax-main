@@ -127,18 +127,22 @@ ${visionText}`);
     return response;
   }
 
-  async generateLevel3(
+    async generateLevel3(
     requirements: string[],
     visionText: string,
     folderStructure: ArchitectLevel2
   ): Promise<ArchitectLevel3> {
-    console.log('Generating level 3 with folder structure');
-    
-    // Validate folder structure before using
-    if (!folderStructure || !folderStructure.rootFolder) {
-      console.error('Invalid folderStructure provided to generateLevel3:', folderStructure);
-      throw new Error('Invalid folder structure: missing rootFolder property');
-    }
+    console.log('=== ARCHITECT SERVICE: GENERATE LEVEL 3 ===');
+    console.log('Requirements count:', requirements.length);
+    console.log('Vision text length:', visionText.length);
+    console.log('Folder structure received:', {
+      type: typeof folderStructure,
+      hasRootFolder: 'rootFolder' in folderStructure,
+      keys: Object.keys(folderStructure),
+      rootFolderType: folderStructure.rootFolder ? typeof folderStructure.rootFolder : 'null/undefined'
+    });
+    console.log('Folder structure JSON (first 300 chars):', 
+               JSON.stringify(folderStructure).substring(0, 300));
     
     const systemPrompt = `You are an expert software architect. Create a detailed implementation plan.
 IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
@@ -165,6 +169,47 @@ IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
     }
   ]
 }`;
+
+    // Validate folder structure before sending
+    if (!folderStructure || !folderStructure.rootFolder) {
+      console.error('CRITICAL ERROR: Invalid folder structure:', folderStructure);
+      throw new Error('Invalid folder structure: missing rootFolder property');
+    }
+
+    try {
+      console.log('Calling Claude API for level 3 implementation plan');
+      const response = await this.callClaude(systemPrompt, `
+Requirements:
+${requirements.join('
+')}
+Architectural Vision:
+${visionText}
+Folder Structure:
+${JSON.stringify(folderStructure, null, 2)}`);
+      
+      console.log('Claude API response received:', {
+        hasImplementationOrder: 'implementationOrder' in response,
+        implementationOrderType: typeof response.implementationOrder,
+        isArray: Array.isArray(response.implementationOrder),
+        length: response.implementationOrder ? response.implementationOrder.length : 0
+      });
+      
+      if (!response.implementationOrder || !Array.isArray(response.implementationOrder)) {
+        console.error('Invalid implementation plan response:', response);
+        throw new Error('Invalid implementation plan response: missing or invalid implementationOrder');
+      }
+      return response;
+    } catch (error) {
+      console.error('Error in generateLevel3:', error);
+      throw error;
+    }
+  }
+      ],
+      "implementations": [],
+      "additionalContext": "implementation context"
+    }
+  ]
+}`;
     const response = await this.callClaude(systemPrompt, `
 Requirements:
 ${requirements.join('\n')}
@@ -172,6 +217,13 @@ Architectural Vision:
 ${visionText}
 Folder Structure:
 ${JSON.stringify(folderStructure, null, 2)}`);
+    
+    console.log('Level 3 response structure check:', {
+      hasImplementationOrder: 'implementationOrder' in response,
+      implementationOrderType: typeof response.implementationOrder,
+      isArray: Array.isArray(response.implementationOrder),
+      length: response.implementationOrder ? response.implementationOrder.length : 0
+    });
     
     if (!response.implementationOrder || !Array.isArray(response.implementationOrder)) {
       console.error('Invalid implementation plan response:', response);

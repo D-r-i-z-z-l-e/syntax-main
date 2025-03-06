@@ -1,0 +1,187 @@
+import React from 'react';
+import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon, CheckIcon } from 'lucide-react';
+import { ArchitectLevel2, FileContext } from '../../lib/types/architect';
+
+interface ArchitectOutputProps {
+  level1Output: { visionText: string } | null;
+  level2Output: ArchitectLevel2 | null;
+  level3Output: { implementationOrder: FileContext[] } | null;
+  currentLevel: 1 | 2 | 3;
+  isThinking: boolean;
+  error: string | null;
+  onProceedToNextLevel: () => void;
+}
+
+export function ArchitectOutput({
+  level1Output,
+  level2Output,
+  level3Output,
+  currentLevel,
+  isThinking,
+  error,
+  onProceedToNextLevel
+}: ArchitectOutputProps) {
+  const getButtonText = () => {
+    switch (currentLevel) {
+      case 1:
+        return 'Design Folder Structure';
+      case 2:
+        return 'Create Implementation Plan';
+      case 3:
+        return 'Generate Project Structure';
+      default:
+        return 'Proceed';
+    }
+  };
+
+  const canProceedToNextLevel = () => {
+    if (isThinking) return false;
+    
+    switch (currentLevel) {
+      case 1:
+        return !!level1Output?.visionText;
+      case 2:
+        return !!level2Output?.rootFolder;
+      case 3:
+        return !!level3Output?.implementationOrder;
+      default:
+        return false;
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="w-full bg-red-50 rounded-lg border border-red-200 p-4 mb-4">
+        <h2 className="text-sm font-semibold text-red-900 mb-2">Error</h2>
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
+
+  if (!level1Output && !isThinking) return null;
+
+  return (
+    <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+      <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
+        <CodeIcon className="w-4 h-4 mr-2" />
+        AI Architect Progress
+        <div className="ml-auto flex items-center space-x-1">
+          <div className={`w-2 h-2 rounded-full ${currentLevel >= 1 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+          <div className={`w-2 h-2 rounded-full ${currentLevel >= 2 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+          <div className={`w-2 h-2 rounded-full ${currentLevel >= 3 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+        </div>
+      </h2>
+      
+      {isThinking ? (
+        <div className="flex items-center justify-center space-x-2 p-6">
+          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-gray-600">
+            {currentLevel === 1 && "Analyzing requirements..."}
+            {currentLevel === 2 && "Designing folder structure..."}
+            {currentLevel === 3 && "Planning implementation details..."}
+          </span>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Level 1: Architectural Vision */}
+          <div className={`transition-all duration-300 ${currentLevel === 1 ? 'opacity-100' : 'opacity-80'}`}>
+            <div className="flex items-center mb-2">
+              <div className={`w-6 h-6 rounded-full ${currentLevel === 1 ? 'bg-blue-600' : 'bg-green-500'} text-white flex items-center justify-center mr-2`}>
+                {currentLevel > 1 ? <CheckIcon className="w-4 h-4" /> : '1'}
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Architectural Vision
+              </h3>
+            </div>
+            
+            {level1Output && (
+              <div className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-3 ml-8 max-h-[200px] overflow-y-auto border border-gray-200">
+                {level1Output.visionText}
+              </div>
+            )}
+          </div>
+
+          {/* Level 2: Folder Structure */}
+          {(currentLevel >= 2 || level2Output) && (
+            <div className={`transition-all duration-300 ${currentLevel === 2 ? 'opacity-100' : 'opacity-80'}`}>
+              <div className="flex items-center mb-2">
+                <div className={`w-6 h-6 rounded-full ${currentLevel === 2 ? 'bg-blue-600' : currentLevel > 2 ? 'bg-green-500' : 'bg-gray-300'} text-white flex items-center justify-center mr-2`}>
+                  {currentLevel > 2 ? <CheckIcon className="w-4 h-4" /> : '2'}
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Project Structure
+                </h3>
+              </div>
+              
+              {level2Output && level2Output.rootFolder && (
+                <div className="bg-gray-50 rounded-lg p-3 ml-8 max-h-[200px] overflow-y-auto border border-gray-200">
+                  {renderFolderStructure(level2Output.rootFolder)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Level 3: Implementation Plan */}
+          {(currentLevel >= 3 || level3Output) && (
+            <div className={`transition-all duration-300 ${currentLevel === 3 ? 'opacity-100' : 'opacity-80'}`}>
+              <div className="flex items-center mb-2">
+                <div className={`w-6 h-6 rounded-full ${currentLevel === 3 ? 'bg-blue-600' : 'bg-gray-300'} text-white flex items-center justify-center mr-2`}>
+                  3
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Implementation Plan
+                </h3>
+              </div>
+              
+              {level3Output && level3Output.implementationOrder && (
+                <div className="bg-gray-50 rounded-lg p-3 ml-8 max-h-[200px] overflow-y-auto border border-gray-200">
+                  {level3Output.implementationOrder.map((file, index) => (
+                    <div key={index} className="mb-3 last:mb-0 text-sm">
+                      <p className="font-medium text-gray-800">{file.path}/{file.name}</p>
+                      <p className="text-xs text-gray-600">{file.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={onProceedToNextLevel}
+            disabled={!canProceedToNextLevel()}
+            className={`w-full mt-4 ${canProceedToNextLevel() 
+              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+            } font-medium rounded-lg px-4 py-2 flex items-center justify-center transition-colors`}
+          >
+            {getButtonText()}
+            <ArrowRightIcon className="w-4 h-4 ml-2" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function renderFolderStructure(folder: ArchitectLevel2['rootFolder'], depth = 0) {
+  if (!folder) {
+    return <div className="text-red-500 text-xs">Error: Invalid folder structure</div>;
+  }
+  
+  return (
+    <div className={`${depth > 0 ? 'ml-4' : ''} text-sm`}>
+      <div className="flex items-start gap-2">
+        <FolderIcon className="w-4 h-4 mt-1 text-blue-500 flex-shrink-0" />
+        <div>
+          <p className="font-medium text-gray-800">{folder.name}</p>
+          <p className="text-xs text-gray-600">{folder.description}</p>
+        </div>
+      </div>
+      {folder.subfolders?.map((subfolder, index) => (
+        <div key={index} className="ml-2 mt-2 border-l-2 border-gray-100 pl-2">
+          {renderFolderStructure(subfolder, depth + 1)}
+        </div>
+      ))}
+    </div>
+  );
+}

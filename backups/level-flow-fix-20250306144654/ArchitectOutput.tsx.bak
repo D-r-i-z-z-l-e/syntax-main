@@ -35,20 +35,15 @@ export function ArchitectOutput({
   };
 
   const canProceedToNextLevel = () => {
-    // Disable the button when thinking
     if (isThinking) return false;
     
-    // Check correct progression based on levels and available data
     switch (currentLevel) {
       case 1:
-        // Can only proceed from level 1 if we have the vision text
         return !!level1Output?.visionText;
       case 2:
-        // Can only proceed from level 2 if we have the folder structure
-        return !!level2Output && !!level2Output.rootFolder;
+        return !!level2Output?.rootFolder;
       case 3:
-        // Can only proceed from level 3 if we have the implementation plan
-        return !!level3Output && Array.isArray(level3Output.implementationOrder);
+        return !!level3Output?.implementationOrder;
       default:
         return false;
     }
@@ -63,7 +58,7 @@ export function ArchitectOutput({
     );
   }
 
-  if (!level1Output && !isThinking && currentLevel === 1) return null;
+  if (!level1Output && !isThinking) return null;
 
   return (
     <div className="w-full architect-card p-5 mb-5">
@@ -98,30 +93,26 @@ export function ArchitectOutput({
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Only show the current level and completed levels */}
-          
           {/* Level 1: Architectural Vision */}
-          {(currentLevel >= 1) && (
-            <div className={`transition-all duration-300 ${currentLevel === 1 ? 'opacity-100' : 'opacity-80'}`}>
-              <div className="flex items-center mb-3">
-                <div className={`w-7 h-7 rounded-full ${currentLevel === 1 ? 'bg-blue-500' : 'bg-green-500'} text-white flex items-center justify-center mr-3`}>
-                  {currentLevel > 1 ? <CheckIcon className="w-4 h-4" /> : '1'}
-                </div>
-                <h3 className="text-base font-semibold text-gray-800">
-                  Architectural Vision
-                </h3>
+          <div className={`transition-all duration-300 ${currentLevel === 1 ? 'opacity-100' : 'opacity-80'}`}>
+            <div className="flex items-center mb-3">
+              <div className={`w-7 h-7 rounded-full ${currentLevel === 1 ? 'bg-blue-500' : 'bg-green-500'} text-white flex items-center justify-center mr-3`}>
+                {currentLevel > 1 ? <CheckIcon className="w-4 h-4" /> : '1'}
               </div>
-              
-              {level1Output && (
-                <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-4 ml-10 max-h-[200px] overflow-y-auto border border-gray-200">
-                  {level1Output.visionText}
-                </div>
-              )}
+              <h3 className="text-base font-semibold text-gray-800">
+                Architectural Vision
+              </h3>
             </div>
-          )}
+            
+            {level1Output && (
+              <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-4 ml-10 max-h-[200px] overflow-y-auto border border-gray-200">
+                {level1Output.visionText}
+              </div>
+            )}
+          </div>
 
-          {/* Level 2: Folder Structure - Only show if we're at level 2 or higher */}
-          {(currentLevel >= 2) && (
+          {/* Level 2: Folder Structure */}
+          {(currentLevel >= 2 || level2Output) && (
             <div className={`transition-all duration-300 ${currentLevel === 2 ? 'opacity-100' : 'opacity-80'}`}>
               <div className="flex items-center mb-3">
                 <div className={`w-7 h-7 rounded-full ${currentLevel === 2 ? 'bg-blue-500' : currentLevel > 2 ? 'bg-green-500' : 'bg-gray-300'} text-white flex items-center justify-center mr-3`}>
@@ -140,8 +131,8 @@ export function ArchitectOutput({
             </div>
           )}
 
-          {/* Level 3: Implementation Plan - Only show if we're at level 3 */}
-          {(currentLevel >= 3) && (
+          {/* Level 3: Implementation Plan */}
+          {(currentLevel >= 3 || level3Output) && (
             <div className={`transition-all duration-300 ${currentLevel === 3 ? 'opacity-100' : 'opacity-80'}`}>
               <div className="flex items-center mb-3">
                 <div className={`w-7 h-7 rounded-full ${currentLevel === 3 ? 'bg-blue-500' : 'bg-gray-300'} text-white flex items-center justify-center mr-3`}>
@@ -165,7 +156,6 @@ export function ArchitectOutput({
             </div>
           )}
 
-          {/* Button to proceed to next level - only visible for the current level */}
           <button
             onClick={onProceedToNextLevel}
             disabled={!canProceedToNextLevel()}

@@ -13,9 +13,24 @@ export async function POST(req: NextRequest) {
       level,
       requirementsCount: requirements?.length,
       hasVisionText: !!visionText,
-      hasFolderStructure: !!folderStructure,
-      folderStructureType: folderStructure ? typeof folderStructure : 'undefined'
+      hasFolderStructure: !!folderStructure
     }));
+    
+    // ENHANCED LOGGING - Inspect folder structure in detail
+    if (folderStructure) {
+      console.log('=== FOLDER STRUCTURE DETAILS ===');
+      console.log('Type:', typeof folderStructure);
+      console.log('Keys:', Object.keys(folderStructure));
+      console.log('Has rootFolder property:', 'rootFolder' in folderStructure);
+      if ('rootFolder' in folderStructure) {
+        console.log('rootFolder type:', typeof folderStructure.rootFolder);
+        console.log('rootFolder keys:', folderStructure.rootFolder ? Object.keys(folderStructure.rootFolder) : 'N/A');
+      }
+      console.log('First 500 chars of JSON representation:', 
+                  JSON.stringify(folderStructure).substring(0, 500));
+    } else {
+      console.log('=== FOLDER STRUCTURE IS MISSING OR NULL ===');
+    }
     
     if (!requirements || !Array.isArray(requirements)) {
       console.log('ERROR: Valid requirements array is required');
@@ -48,25 +63,19 @@ export async function POST(req: NextRequest) {
           }, { status: 400 });
         }
         
-        // Always ensure folder structure has rootFolder properly defined
-        let normalizedFolderStructure;
+        // Deep logging of folder structure before normalization
+        console.log('=== BEFORE NORMALIZATION ===');
+        console.log(JSON.stringify(folderStructure, null, 2));
         
-        if (typeof folderStructure === 'object' && 'rootFolder' in folderStructure && folderStructure.rootFolder) {
-          console.log('Using provided folder structure with rootFolder');
-          normalizedFolderStructure = folderStructure;
-        } else {
-          console.log('Creating normalized folder structure with rootFolder');
-          normalizedFolderStructure = { 
-            rootFolder: typeof folderStructure === 'object' ? folderStructure : {
-              name: "project-root",
-              description: "Root directory for the project",
-              purpose: "Main project folder",
-              subfolders: []
-            }
-          };
-        }
+        // Make sure folderStructure has a rootFolder property
+        const normalizedFolderStructure = typeof folderStructure === 'object' && 'rootFolder' in folderStructure
+          ? folderStructure
+          : { rootFolder: folderStructure };
         
-        console.log('Normalized folder structure has rootFolder:', 'rootFolder' in normalizedFolderStructure);
+        // Deep logging of folder structure after normalization
+        console.log('=== AFTER NORMALIZATION ===');
+        console.log(JSON.stringify(normalizedFolderStructure, null, 2));
+        console.log('Has rootFolder property:', 'rootFolder' in normalizedFolderStructure);
         
         result = await architectService.generateLevel3(requirements, visionText, normalizedFolderStructure);
         break;
@@ -82,6 +91,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('=== ERROR IN ARCHITECT API ===');
     console.error(error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to generate architect output' },
       { status: 500 }

@@ -1,3 +1,346 @@
+#!/bin/bash
+
+# Script to enhance UI aesthetics and fix specific issues
+# Run this from your syntax-main directory
+
+set -e  # Exit on error
+
+echo "=== Enhancing UI aesthetics and fixing specific issues ==="
+
+# Create backup directory
+mkdir -p ./backups/ui-enhancement-$(date +%Y%m%d%H%M%S)
+BACKUP_DIR="./backups/ui-enhancement-$(date +%Y%m%d%H%M%S)"
+
+# Backup existing files
+cp ./src/components/conversation/ArchitectOutput.tsx "$BACKUP_DIR/ArchitectOutput.tsx.bak"
+cp ./src/components/conversation/ConversationUI.tsx "$BACKUP_DIR/ConversationUI.tsx.bak"
+cp ./src/app/globals.css "$BACKUP_DIR/globals.css.bak"
+
+echo "Backed up original files to $BACKUP_DIR"
+
+# Update the globals.css file for better aesthetics and to fix the text input color
+cat > ./src/app/globals.css << 'EOF'
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fafc;
+  --foreground: #334155;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --secondary: #64748b;
+  --accent: #f59e0b;
+  --border: #e2e8f0;
+  --card: #ffffff;
+  --input-bg: #ffffff;
+  --input-text: #1e293b;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --header-bg: #ffffff;
+  --footer-bg: #ffffff;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+textarea, 
+input[type="text"], 
+input[type="email"], 
+input[type="password"] {
+  color: var(--input-text) !important;
+}
+
+.card-shadow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.architect-card {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease-in-out;
+}
+
+.architect-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.progress-indicator {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.progress-indicator .step {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: white;
+  position: relative;
+  z-index: 10;
+}
+
+.progress-indicator .step.active {
+  background-color: var(--primary);
+}
+
+.progress-indicator .step.completed {
+  background-color: var(--success);
+}
+
+.progress-indicator .step.inactive {
+  background-color: var(--secondary);
+  opacity: 0.5;
+}
+
+.progress-indicator .line {
+  height: 2px;
+  flex: 1;
+  background-color: var(--border);
+}
+
+.progress-indicator .line.active {
+  background-color: var(--primary);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+EOF
+
+echo "Updated CSS with improved styles and fixed text input color"
+
+# Update the ArchitectOutput component for better aesthetics
+cat > ./src/components/conversation/ArchitectOutput.tsx << 'EOF'
+import React from 'react';
+import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon, CheckIcon } from 'lucide-react';
+import { ArchitectLevel2, FileContext } from '../../lib/types/architect';
+
+interface ArchitectOutputProps {
+  level1Output: { visionText: string } | null;
+  level2Output: ArchitectLevel2 | null;
+  level3Output: { implementationOrder: FileContext[] } | null;
+  currentLevel: 1 | 2 | 3;
+  isThinking: boolean;
+  error: string | null;
+  onProceedToNextLevel: () => void;
+}
+
+export function ArchitectOutput({
+  level1Output,
+  level2Output,
+  level3Output,
+  currentLevel,
+  isThinking,
+  error,
+  onProceedToNextLevel
+}: ArchitectOutputProps) {
+  const getButtonText = () => {
+    switch (currentLevel) {
+      case 1:
+        return 'Design Folder Structure';
+      case 2:
+        return 'Create Implementation Plan';
+      case 3:
+        return 'Generate Project Structure';
+      default:
+        return 'Proceed';
+    }
+  };
+
+  const canProceedToNextLevel = () => {
+    if (isThinking) return false;
+    
+    switch (currentLevel) {
+      case 1:
+        return !!level1Output?.visionText;
+      case 2:
+        return !!level2Output?.rootFolder;
+      case 3:
+        return !!level3Output?.implementationOrder;
+      default:
+        return false;
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="w-full bg-red-50 rounded-lg border border-red-200 p-4 mb-4">
+        <h2 className="text-sm font-semibold text-red-900 mb-2">Error</h2>
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
+
+  if (!level1Output && !isThinking) return null;
+
+  return (
+    <div className="w-full architect-card p-5 mb-5">
+      <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center">
+        <CodeIcon className="w-4 h-4 mr-2 text-blue-500" />
+        AI Architect Progress
+      </h2>
+      
+      {/* Progress Indicator */}
+      <div className="progress-indicator mb-6">
+        <div className={`step ${currentLevel >= 1 ? (currentLevel > 1 ? 'completed' : 'active') : 'inactive'}`}>
+          {currentLevel > 1 ? <CheckIcon className="w-4 h-4" /> : 1}
+        </div>
+        <div className={`line ${currentLevel > 1 ? 'active' : ''}`}></div>
+        <div className={`step ${currentLevel >= 2 ? (currentLevel > 2 ? 'completed' : 'active') : 'inactive'}`}>
+          {currentLevel > 2 ? <CheckIcon className="w-4 h-4" /> : 2}
+        </div>
+        <div className={`line ${currentLevel > 2 ? 'active' : ''}`}></div>
+        <div className={`step ${currentLevel >= 3 ? 'active' : 'inactive'}`}>
+          3
+        </div>
+      </div>
+      
+      {isThinking ? (
+        <div className="flex items-center justify-center space-x-3 py-8">
+          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-gray-600 font-medium">
+            {currentLevel === 1 && "Analyzing requirements..."}
+            {currentLevel === 2 && "Designing folder structure..."}
+            {currentLevel === 3 && "Planning implementation details..."}
+          </span>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Level 1: Architectural Vision */}
+          <div className={`transition-all duration-300 ${currentLevel === 1 ? 'opacity-100' : 'opacity-80'}`}>
+            <div className="flex items-center mb-3">
+              <div className={`w-7 h-7 rounded-full ${currentLevel === 1 ? 'bg-blue-500' : 'bg-green-500'} text-white flex items-center justify-center mr-3`}>
+                {currentLevel > 1 ? <CheckIcon className="w-4 h-4" /> : '1'}
+              </div>
+              <h3 className="text-base font-semibold text-gray-800">
+                Architectural Vision
+              </h3>
+            </div>
+            
+            {level1Output && (
+              <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-4 ml-10 max-h-[200px] overflow-y-auto border border-gray-200">
+                {level1Output.visionText}
+              </div>
+            )}
+          </div>
+
+          {/* Level 2: Folder Structure */}
+          {(currentLevel >= 2 || level2Output) && (
+            <div className={`transition-all duration-300 ${currentLevel === 2 ? 'opacity-100' : 'opacity-80'}`}>
+              <div className="flex items-center mb-3">
+                <div className={`w-7 h-7 rounded-full ${currentLevel === 2 ? 'bg-blue-500' : currentLevel > 2 ? 'bg-green-500' : 'bg-gray-300'} text-white flex items-center justify-center mr-3`}>
+                  {currentLevel > 2 ? <CheckIcon className="w-4 h-4" /> : '2'}
+                </div>
+                <h3 className="text-base font-semibold text-gray-800">
+                  Project Structure
+                </h3>
+              </div>
+              
+              {level2Output && level2Output.rootFolder && (
+                <div className="bg-gray-50 rounded-lg p-4 ml-10 max-h-[250px] overflow-y-auto border border-gray-200">
+                  {renderFolderStructure(level2Output.rootFolder)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Level 3: Implementation Plan */}
+          {(currentLevel >= 3 || level3Output) && (
+            <div className={`transition-all duration-300 ${currentLevel === 3 ? 'opacity-100' : 'opacity-80'}`}>
+              <div className="flex items-center mb-3">
+                <div className={`w-7 h-7 rounded-full ${currentLevel === 3 ? 'bg-blue-500' : 'bg-gray-300'} text-white flex items-center justify-center mr-3`}>
+                  3
+                </div>
+                <h3 className="text-base font-semibold text-gray-800">
+                  Implementation Plan
+                </h3>
+              </div>
+              
+              {level3Output && level3Output.implementationOrder && (
+                <div className="bg-gray-50 rounded-lg p-4 ml-10 max-h-[250px] overflow-y-auto border border-gray-200">
+                  {level3Output.implementationOrder.map((file, index) => (
+                    <div key={index} className="mb-4 last:mb-0 text-sm">
+                      <p className="font-medium text-gray-800">{file.path}/{file.name}</p>
+                      <p className="text-xs text-gray-600 mt-1">{file.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={onProceedToNextLevel}
+            disabled={!canProceedToNextLevel()}
+            className={`w-full mt-6 ${canProceedToNextLevel() 
+              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            } font-medium rounded-lg px-5 py-3 flex items-center justify-center transition-colors`}
+          >
+            {getButtonText()}
+            <ArrowRightIcon className="w-4 h-4 ml-2" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function renderFolderStructure(folder: ArchitectLevel2['rootFolder'], depth = 0) {
+  if (!folder) {
+    return <div className="text-red-500 text-xs">Error: Invalid folder structure</div>;
+  }
+  
+  return (
+    <div className={`${depth > 0 ? 'ml-5' : ''} text-sm`}>
+      <div className="flex items-start gap-3 mb-2">
+        <FolderIcon className="w-4 h-4 mt-1 text-blue-500 flex-shrink-0" />
+        <div>
+          <p className="font-medium text-gray-800">{folder.name}</p>
+          <p className="text-xs text-gray-600 mt-1">{folder.description}</p>
+        </div>
+      </div>
+      {folder.subfolders?.map((subfolder, index) => (
+        <div key={index} className="ml-3 mt-3 border-l-2 border-gray-100 pl-3">
+          {renderFolderStructure(subfolder, depth + 1)}
+        </div>
+      ))}
+    </div>
+  );
+}
+EOF
+
+echo "Updated ArchitectOutput component with improved visual design"
+
+# Update the ConversationUI component for better aesthetics
+cat > ./src/components/conversation/ConversationUI.tsx << 'EOF'
 "use client";
 
 import { useRef, useEffect, useState } from 'react';
@@ -346,3 +689,18 @@ export function ConversationUI() {
     </div>
   );
 }
+EOF
+
+echo "Updated ConversationUI component with refined visual design"
+
+echo "=== UI Enhancements Complete ==="
+echo "The following UI improvements have been made:"
+echo "1. Fixed text color in the input field to be black"
+echo "2. Enhanced the overall visual design with better spacing and colors"
+echo "3. Improved the architect progress visualization"
+echo "4. Added proper disabled state styling for the 'Create Implementation Plan' button"
+echo "5. Refined shadows, borders, and colors for a more polished look"
+echo "6. Added custom scrollbars for a better scrolling experience"
+echo "7. Enhanced the visual hierarchy of information"
+echo ""
+echo "Your changes have been applied successfully!"
