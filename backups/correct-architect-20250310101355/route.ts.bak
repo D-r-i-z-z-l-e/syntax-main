@@ -25,24 +25,17 @@ export async function POST(req: NextRequest) {
     let result;
     switch (level) {
       case 1:
-        // Level 1: Generate architectural vision
-        console.log('Generating level 1: Architectural Vision');
         result = await architectService.generateLevel1(requirements);
         break;
-        
       case 2:
-        // Level 2: Generate project structure based on vision
-        console.log('Generating level 2: Project Structure');
         if (!visionText) {
           console.log('ERROR: Vision text is required for level 2');
           return NextResponse.json({ error: 'Vision text is required for level 2' }, { status: 400 });
         }
         result = await architectService.generateLevel2(requirements, visionText);
         break;
-        
       case 3:
-        // Level 3: Generate implementation plan based on vision and structure
-        console.log('Generating level 3: Implementation Plan');
+        console.log('=== PROCESSING LEVEL 3 REQUEST ===');
         if (!visionText) {
           console.log('ERROR: Vision text is required for level 3');
           return NextResponse.json({ error: 'Vision text is required for level 3' }, { status: 400 });
@@ -55,29 +48,35 @@ export async function POST(req: NextRequest) {
           }, { status: 400 });
         }
         
-        // Ensure folder structure has a rootFolder property
-        const normalizedFolderStructure = typeof folderStructure === 'object' && 'rootFolder' in folderStructure && folderStructure.rootFolder
-          ? folderStructure
-          : { 
-              rootFolder: typeof folderStructure === 'object' ? folderStructure : {
-                name: "project-root",
-                description: "Root directory for the project",
-                purpose: "Main project folder",
-                subfolders: []
-              }
-            };
+        // Always ensure folder structure has rootFolder properly defined
+        let normalizedFolderStructure;
         
-        console.log('Proceeding with normalized folder structure');
+        if (typeof folderStructure === 'object' && 'rootFolder' in folderStructure && folderStructure.rootFolder) {
+          console.log('Using provided folder structure with rootFolder');
+          normalizedFolderStructure = folderStructure;
+        } else {
+          console.log('Creating normalized folder structure with rootFolder');
+          normalizedFolderStructure = { 
+            rootFolder: typeof folderStructure === 'object' ? folderStructure : {
+              name: "project-root",
+              description: "Root directory for the project",
+              purpose: "Main project folder",
+              subfolders: []
+            }
+          };
+        }
+        
+        console.log('Normalized folder structure has rootFolder:', 'rootFolder' in normalizedFolderStructure);
         
         result = await architectService.generateLevel3(requirements, visionText, normalizedFolderStructure);
         break;
-        
       default:
         console.log('ERROR: Invalid architect level:', level);
         return NextResponse.json({ error: 'Invalid architect level' }, { status: 400 });
     }
     
-    console.log(`Architect API level ${level} completed successfully`);
+    console.log('API call completed successfully with result:', 
+                result ? 'Result has data' : 'No result data');
     
     return NextResponse.json(result);
   } catch (error) {

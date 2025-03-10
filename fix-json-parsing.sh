@@ -1,3 +1,21 @@
+#!/bin/bash
+
+# Script to fix the JSON parsing error in the architect system
+# Run this from your syntax-main directory
+
+set -e  # Exit on error
+
+echo "=== Fixing JSON parsing error in architect system ==="
+
+# Create backup
+mkdir -p ./backups/json-fix-$(date +%Y%m%d%H%M%S)
+BACKUP_DIR="./backups/json-fix-$(date +%Y%m%d%H%M%S)"
+cp ./src/lib/services/architect.service.ts "$BACKUP_DIR/architect.service.ts.bak"
+
+echo "Backed up original file to $BACKUP_DIR"
+
+# Update the architect service with more robust JSON handling
+cat > ./src/lib/services/architect.service.ts << 'EOF'
 import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3 } from '../types/architect';
 
 class ArchitectService {
@@ -382,3 +400,15 @@ ${this.formatKeyFilesForPrompt(keyFiles)}
 }
 
 export const architectService = ArchitectService.getInstance();
+EOF
+
+echo "=== JSON Parsing Fix Applied ==="
+echo "The following changes have been made:"
+echo "1. Improved JSON extraction from Claude responses"
+echo "2. Added fallback implementation for parsing errors"
+echo "3. Simplified prompts to ensure valid JSON responses"
+echo "4. Added smarter file selection to focus on key files"
+echo "5. Lowered temperature for more deterministic output"
+echo ""
+echo "This fix should resolve the JSON parsing errors while still providing"
+echo "a comprehensive architecture blueprint."
