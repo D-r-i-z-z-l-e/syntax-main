@@ -9,6 +9,8 @@ interface ArchitectOutputProps {
   currentLevel: 1 | 2 | 3;
   isThinking: boolean;
   error: string | null;
+  completedFiles: number;
+  totalFiles: number;
   onProceedToNextLevel: () => void;
 }
 
@@ -19,6 +21,8 @@ export function ArchitectOutput({
   currentLevel,
   isThinking,
   error,
+  completedFiles,
+  totalFiles,
   onProceedToNextLevel
 }: ArchitectOutputProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,12 +59,12 @@ export function ArchitectOutput({
   const getTotalFileCount = (rootFolder: any): number => {
     let count = 0;
     
-    // Count files in current folder
+    // Count files in this folder
     if (rootFolder.files && Array.isArray(rootFolder.files)) {
       count += rootFolder.files.length;
     }
     
-    // Count files in subfolders
+    // Recursively count files in subfolders
     if (rootFolder.subfolders && Array.isArray(rootFolder.subfolders)) {
       for (const subfolder of rootFolder.subfolders) {
         count += getTotalFileCount(subfolder);
@@ -116,8 +120,26 @@ export function ArchitectOutput({
           <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-gray-600 font-medium">
             {currentLevel === 1 && "Creating comprehensive architectural vision..."}
-            {currentLevel === 2 && "Designing complete project structure..."}
-            {currentLevel === 3 && "Developing detailed implementation plans..."}
+            {currentLevel === 2 && "Designing complete project structure with dependency tree..."}
+            {currentLevel === 3 && (
+              <div className="flex flex-col items-center">
+                <span>Developing detailed implementation plans...</span>
+                {totalFiles > 0 && (
+                  <div className="mt-2 w-full max-w-xs">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>{completedFiles} of {totalFiles} files</span>
+                      <span>{Math.round((completedFiles / totalFiles) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="h-2 rounded-full bg-blue-500"
+                        style={{ width: `${(completedFiles / totalFiles) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </span>
         </div>
       ) : (
@@ -131,7 +153,7 @@ export function ArchitectOutput({
             </h3>
             <p className="text-sm text-gray-500">
               {currentLevel === 1 && "A comprehensive blueprint of the software architecture"}
-              {currentLevel === 2 && `Complete project skeleton with ${level2Output?.rootFolder ? getTotalFileCount(level2Output.rootFolder) : 0} files`}
+              {currentLevel === 2 && `Project skeleton with dependency tree (${level2Output?.dependencyTree?.files?.length || 0} files)`}
               {currentLevel === 3 && `Detailed implementation instructions for ${level3Output?.implementationOrder?.length || 0} files`}
             </p>
           </div>
@@ -167,16 +189,59 @@ export function ArchitectOutput({
                     <LayersIcon className="w-4 h-4" />
                   </div>
                   <h3 className="text-base font-semibold text-gray-800">
-                    Project Files & Directories
+                    Project Structure with Dependencies
                   </h3>
                 </div>
                 <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
-                  {getTotalFileCount(level2Output.rootFolder)} files
+                  {level2Output.dependencyTree?.files?.length || 0} files
                 </div>
               </div>
               
               <div className="bg-gray-50 rounded-lg p-4 max-h-[600px] overflow-y-auto border border-gray-200">
                 {renderFolderStructure(level2Output.rootFolder)}
+              </div>
+              
+              <div className="mt-4">
+                <div className="mb-3 flex items-center">
+                  <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
+                    <CodeIcon className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-800">
+                    Implementation Order
+                  </h3>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4 max-h-[300px] overflow-y-auto border border-gray-200">
+                  <div className="space-y-2">
+                    {level2Output.dependencyTree?.files?.sort((a, b) => a.implementationOrder - b.implementationOrder)
+                      .map((file, index) => (
+                        <div key={index} className="flex items-start">
+                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center mr-2 flex-shrink-0 text-xs font-medium">
+                            {file.implementationOrder}
+                          </div>
+                          <div>
+                            <div className="flex items-center">
+                              <FileIcon className="h-4 w-4 mr-2 text-gray-500" />
+                              <span className="font-medium text-gray-900">{file.path}/{file.name}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">{file.description}</p>
+                            {file.dependencies.length > 0 && (
+                              <div className="mt-1">
+                                <span className="text-xs text-gray-500">Depends on: </span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {file.dependencies.map((dep, idx) => (
+                                    <span key={idx} className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                                      {dep}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}

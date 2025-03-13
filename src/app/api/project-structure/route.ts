@@ -17,7 +17,10 @@ Architectural Vision:
 ${architectVision || 'No architectural vision provided.'}
 
 Folder Structure:
-${JSON.stringify(folderStructure || {}, null, 2)}
+${JSON.stringify(folderStructure.rootFolder || {}, null, 2)}
+
+Dependency Tree:
+${JSON.stringify(folderStructure.dependencyTree || {}, null, 2)}
 
 Implementation Plan:
 ${JSON.stringify(implementationPlan || {}, null, 2)}

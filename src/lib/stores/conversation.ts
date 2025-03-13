@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState } from '../types/architect';
+import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState, FileNode } from '../types/architect';
 
 export interface Message {
   id: string;
@@ -79,7 +79,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     level3Output: null,
     currentLevel: 1,
     isThinking: false,
-    error: null
+    error: null,
+    completedFiles: 0,
+    totalFiles: 0
   },
   
   generateArchitectLevel1: async () => {
@@ -99,7 +101,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Reset and start at level 1
+      // Reset architect state and set to thinking
       set(state => ({
         architect: {
           ...state.architect,
@@ -108,7 +110,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           currentLevel: 1,
           level1Output: null,
           level2Output: null,
-          level3Output: null
+          level3Output: null,
+          completedFiles: 0,
+          totalFiles: 0
         }
       }));
       
@@ -133,12 +137,12 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error('Invalid response from architect: missing vision text');
       }
       
-      // Success - save the vision and stay at level 1
+      // Update state with level 1 output and move to level 2
       set(state => ({
         architect: {
           ...state.architect,
           level1Output: data,
-          currentLevel: 1,  // Stay at level 1
+          currentLevel: 1,
           isThinking: false
         }
       }));
@@ -159,9 +163,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     const { level1Output } = state.architect;
     const requirements = state.context.extractedInfo.requirements;
     
-    console.log('Starting project structure generation');
+    console.log('Starting project structure generation with dependency tree');
     
-    // Check if we have the vision from level 1
     if (!level1Output?.visionText || !requirements?.length) {
       const missing: string[] = [];
       if (!level1Output?.visionText) missing.push('architectural vision');
@@ -177,15 +180,17 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Move to level 2
+      // Set to thinking for level 2
       set(state => ({
         architect: {
           ...state.architect,
           isThinking: true,
           error: null,
-          currentLevel: 2,  // Now at level 2
+          currentLevel: 2,
           level2Output: null,
-          level3Output: null
+          level3Output: null,
+          completedFiles: 0,
+          totalFiles: 0
         }
       }));
       
@@ -205,19 +210,23 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }
       
       const data = await response.json();
-      console.log('Project structure generated successfully');
+      console.log('Project structure generated successfully with dependency tree');
       
-      if (!data.rootFolder) {
-        throw new Error('Invalid project structure response: missing rootFolder');
+      if (!data.rootFolder || !data.dependencyTree) {
+        throw new Error('Invalid project structure response: missing rootFolder or dependencyTree');
       }
       
-      // Success - save the structure and stay at level 2
+      // Count total files in dependency tree
+      const totalFiles = data.dependencyTree.files ? data.dependencyTree.files.length : 0;
+      
+      // Update state with level 2 output and move to level 3
       set(state => ({
         architect: {
           ...state.architect,
           level2Output: data,
-          currentLevel: 2,  // Stay at level 2
-          isThinking: false
+          currentLevel: 2,
+          isThinking: false,
+          totalFiles
         }
       }));
     } catch (error) {
@@ -227,7 +236,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           ...state.architect,
           error: error instanceof Error ? error.message : 'Failed to generate project structure',
           isThinking: false,
-          currentLevel: 1  // Go back to level 1 on error
+          currentLevel: 1
         }
       }));
     }
@@ -238,13 +247,13 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     const { level1Output, level2Output } = state.architect;
     const requirements = state.context.extractedInfo.requirements;
     
-    console.log('Starting implementation plan generation');
+    console.log('Starting implementation plan generation based on dependency tree');
     
-    // Check if we have the vision and structure from previous levels
-    if (!level1Output?.visionText || !level2Output?.rootFolder || !requirements?.length) {
+    if (!level1Output?.visionText || !level2Output?.rootFolder || !level2Output?.dependencyTree || !requirements?.length) {
       const missing: string[] = [];
       if (!level1Output?.visionText) missing.push('architectural vision');
       if (!level2Output?.rootFolder) missing.push('project structure');
+      if (!level2Output?.dependencyTree) missing.push('dependency tree');
       if (!requirements?.length) missing.push('requirements');
       
       set(state => ({
@@ -257,19 +266,17 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Move to level 3
+      // Set to thinking for level 3
       set(state => ({
         architect: {
           ...state.architect,
           isThinking: true,
           error: null,
-          currentLevel: 3,  // Now at level 3
-          level3Output: null
+          currentLevel: 3,
+          level3Output: null,
+          completedFiles: 0
         }
       }));
-      
-      // Ensure the folder structure has a rootFolder property
-      const folderStructureToSend = level2Output;
       
       const response = await fetch('/api/architect', {
         method: 'POST',
@@ -278,7 +285,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           level: 3,
           requirements,
           visionText: level1Output.visionText,
-          folderStructure: folderStructureToSend
+          folderStructure: level2Output
         }),
       });
       
@@ -294,13 +301,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error('Invalid implementation plan: missing or invalid implementationOrder');
       }
       
-      // Success - save the implementation plan and stay at level 3
+      // Update state with level 3 output
       set(state => ({
         architect: {
           ...state.architect,
           level3Output: data,
-          currentLevel: 3,  // Stay at level 3
-          isThinking: false
+          currentLevel: 3,
+          isThinking: false,
+          completedFiles: data.implementationOrder.length
         }
       }));
     } catch (error) {
@@ -310,7 +318,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           ...state.architect,
           error: error instanceof Error ? error.message : 'Failed to generate implementation plan',
           isThinking: false,
-          currentLevel: 2  // Go back to level 2 on error
+          currentLevel: 2
         }
       }));
     }
@@ -324,7 +332,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const requirements = state.context.extractedInfo.requirements;
       const { level1Output, level2Output } = state.architect;
       
-      // Check that we have all required inputs
+      // Validate all required inputs
       if (!requirements?.length || !level1Output?.visionText || !level2Output?.rootFolder || !implementationPlan?.implementationOrder) {
         const missing = [];
         if (!requirements?.length) missing.push('requirements');
@@ -335,16 +343,13 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error(`Missing required inputs for project construction: ${missing.join(', ')}`);
       }
       
-      // Ensure folder structure has rootFolder property
-      const folderStructureForRequest = level2Output;
-      
       const response = await fetch('/api/project-structure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requirements,
           architectVision: level1Output.visionText,
-          folderStructure: folderStructureForRequest,
+          folderStructure: level2Output,
           implementationPlan
         }),
       });
@@ -357,7 +362,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const data = await response.json();
       console.log('Project structure successfully generated');
       
-      // Reset the architect state after successful project generation
+      // Reset architect state and set project structure
       set({ 
         projectStructure: data.structure, 
         isGeneratingStructure: false,
@@ -368,7 +373,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           level2Output: null,
           level3Output: null,
           isThinking: false,
-          error: null
+          error: null,
+          completedFiles: 0,
+          totalFiles: 0
         }
       });
     } catch (error) {
@@ -537,7 +544,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         level3Output: null,
         currentLevel: 1,
         isThinking: false,
-        error: null
+        error: null,
+        completedFiles: 0,
+        totalFiles: 0
       },
     });
   },

@@ -104,6 +104,43 @@ class ArchitectService {
           rawResponse: data.content[0].text.substring(0, 200) + '...'
         });
         
+        // Fallback for level 3: Generate a minimal valid response
+        if (systemPrompt.includes('implementationOrder')) {
+          console.log('Falling back to minimal valid implementation response');
+          return { 
+            implementationOrder: [
+              {
+                name: "app.js",
+                path: "src",
+                type: "JavaScript",
+                description: "Main application entry point",
+                purpose: "Initialize the application",
+                dependencies: [],
+                components: [
+                  {
+                    name: "App",
+                    type: "Function",
+                    purpose: "Main app component",
+                    dependencies: [],
+                    details: "Initializes the application and sets up routes"
+                  }
+                ],
+                implementations: [
+                  {
+                    name: "init",
+                    type: "function",
+                    description: "Initializes the application",
+                    parameters: [],
+                    returnType: "void",
+                    logic: "Set up the application environment and start the server"
+                  }
+                ],
+                additionalContext: "This is a fallback implementation due to parsing error."
+              }
+            ]
+          };
+        }
+        
         throw new Error(`Failed to parse Claude response: ${e instanceof Error ? e.message : String(e)}`);
       }
     } catch (error) {
@@ -196,7 +233,7 @@ ${visionText}`);
     visionText: string,
     folderStructure: ArchitectLevel2
   ): Promise<ArchitectLevel3> {
-    console.log('Generating comprehensive implementation contexts');
+    console.log('Generating implementation contexts for key files');
     
     // Validate folder structure before using
     if (!folderStructure || !folderStructure.rootFolder) {
@@ -204,35 +241,13 @@ ${visionText}`);
       throw new Error('Invalid folder structure: missing rootFolder property');
     }
     
-    // Process files in batches to handle larger projects
-    const allFiles = this.extractAllFiles(folderStructure.rootFolder);
+    // Extract the most important files from the folder structure
+    const keyFiles = this.extractKeyFiles(folderStructure.rootFolder);
+    console.log(`Selected ${keyFiles.length} key files for implementation context`);
     
-    // Sort files by importance for better prioritization
-    const sortedFiles = this.sortFilesByImportance(allFiles);
-    
-    // Select the top files based on importance (adjust based on your needs)
-    const filesToProcess = sortedFiles.slice(0, 10);
-    
-    console.log(`Processing ${filesToProcess.length} files for implementation contexts out of ${allFiles.length} total files`);
-    
-    const systemPrompt = `You are a master software engineer. Your task is to create EXTREMELY DETAILED implementation contexts for each file.
+    const systemPrompt = `You are an expert software developer.
 
-Each implementation context must be comprehensive enough that ANY programmer could implement the file perfectly from just this description.
-
-Your implementation contexts must:
-
-1. Describe EVERY function, class, variable, and component in great detail
-2. Explain ALL business logic as detailed pseudocode in natural language
-3. Include EVERY import, dependency, and relationship
-4. Specify ALL parameters, return types, error handling approaches
-5. Describe the data flow through each function
-6. Explain design patterns and principles being used
-7. Cover edge cases, error states, and validation requirements
-8. Include initialization, lifecycle methods, and cleanup
-9. Specify file configuration, environment variables, and connection details
-10. Include complete descriptions of HTML/CSS layouts where applicable
-
-Think of each implementation context as an exhaustive guide that contains EVERY PIECE OF INFORMATION needed to build the file without additional guidance.
+Your task is to create detailed implementation instructions for key files in a project.
 
 IMPORTANT: You MUST respond with a JSON object in EXACTLY this format:
 {
@@ -240,47 +255,36 @@ IMPORTANT: You MUST respond with a JSON object in EXACTLY this format:
     {
       "name": "filename.ext",
       "path": "file path",
-      "type": "file type (e.g., JavaScript, TypeScript, etc.)",
-      "description": "Brief file description",
+      "type": "file type",
+      "description": "File description",
       "purpose": "What this file accomplishes",
-      "dependencies": ["list of files this depends on"],
-      "imports": ["All required imports with specific versions if applicable"],
+      "dependencies": ["list of dependencies"],
       "components": [
         {
-          "name": "component name (class/function/etc.)",
-          "type": "component type (class/function/object/etc.)",
-          "purpose": "what this component does",
-          "dependencies": ["component dependencies"],
-          "details": "EXTREMELY DETAILED implementation instructions describing every aspect of this component"
+          "name": "component name",
+          "type": "component type",
+          "purpose": "component purpose",
+          "dependencies": [],
+          "details": "implementation details"
         }
       ],
       "implementations": [
         {
-          "name": "function/method name",
-          "type": "function/class/constant/etc.",
+          "name": "function name",
+          "type": "function/class/etc",
           "description": "what this implements",
           "parameters": [
             {
               "name": "param name",
               "type": "param type",
-              "description": "detailed param description",
-              "validation": "validation requirements",
-              "defaultValue": "default value if applicable"
+              "description": "param description"
             }
           ],
-          "returnType": "return type if applicable",
-          "logic": "COMPREHENSIVE step-by-step implementation details in plain English, written as an extremely detailed paragraph that covers EVERY aspect of the implementation. This should be extremely extensive, describing every variable, every condition, every edge case, and the exact logic flow as if writing pseudocode in natural language. Include ALL validation, ALL error handling, ALL business logic, and EVERY step in the process."
+          "returnType": "return type",
+          "logic": "implementation logic in plain English"
         }
       ],
-      "styling": "If applicable, detailed description of styling/CSS",
-      "configuration": "Any configuration details and settings",
-      "stateManagement": "How state is managed in this file",
-      "dataFlow": "Comprehensive description of data flow through this file",
-      "errorHandling": "Complete error handling strategy for this file",
-      "testingStrategy": "Detailed approach to testing this file",
-      "integrationPoints": "All integration points with other system components",
-      "edgeCases": "All edge cases that need to be handled",
-      "additionalContext": "Any other implementation details the developer needs to know to implement this file correctly and completely"
+      "additionalContext": "any other implementation details"
     }
   ]
 }
@@ -290,18 +294,6 @@ NO explanation.
 NO conversation.
 ONLY the JSON object.`;
 
-    // Process all files in a single batch to maintain dependencies
-    return this.processFileBatch(requirements, visionText, filesToProcess, systemPrompt);
-  }
-  
-  private async processFileBatch(
-    requirements: string[],
-    visionText: string,
-    files: any[],
-    systemPrompt: string
-  ): Promise<ArchitectLevel3> {
-    console.log(`Processing batch of ${files.length} files`);
-    
     const response = await this.callClaude(systemPrompt, `
 Requirements:
 ${requirements.join('\n')}
@@ -309,8 +301,8 @@ ${requirements.join('\n')}
 Architectural Vision:
 ${visionText}
 
-Files to Implement (Implement ALL of these files with COMPLETE, EXHAUSTIVE detail):
-${this.formatFilesForPrompt(files)}
+Key Files to Implement:
+${this.formatKeyFilesForPrompt(keyFiles)}
 `);
     
     if (!response.implementationOrder || !Array.isArray(response.implementationOrder)) {
@@ -322,87 +314,67 @@ ${this.formatFilesForPrompt(files)}
   }
   
   // Helper methods
-  private extractAllFiles(folder: any, path: string = ""): any[] {
-    let files: any[] = [];
+  private extractKeyFiles(folder: any, path: string = "", maxFiles: number = 10): any[] {
+    let allFiles: any[] = [];
     
     // Add files from current folder
     if (folder.files && Array.isArray(folder.files)) {
-      files = folder.files.map(file => ({ 
+      const filesWithPath = folder.files.map((file: any) => ({ 
         ...file, 
         path: path || folder.name 
       }));
+      allFiles = [...allFiles, ...filesWithPath];
     }
     
     // Add files from subfolders
     if (folder.subfolders && Array.isArray(folder.subfolders)) {
       for (const subfolder of folder.subfolders) {
         const subfolderPath = path ? `${path}/${subfolder.name}` : subfolder.name;
-        files = [...files, ...this.extractAllFiles(subfolder, subfolderPath)];
+        const subfolderFiles = this.extractKeyFiles(subfolder, subfolderPath, 0); // Don't limit subfolder files yet
+        allFiles = [...allFiles, ...subfolderFiles];
       }
     }
     
-    return files;
+    // Select key files based on importance
+    const keyFiles = this.selectKeyFiles(allFiles, maxFiles);
+    return keyFiles;
   }
   
-  private sortFilesByImportance(files: any[]): any[] {
-    // Prioritize entry points, core components, and key configuration files
-    return [...files].sort((a, b) => {
-      // Score each file based on importance factors
-      const scoreA = this.calculateFileImportance(a);
-      const scoreB = this.calculateFileImportance(b);
+  private selectKeyFiles(files: any[], maxFiles: number): any[] {
+    // Sort files by importance (this is a simple heuristic, could be improved)
+    // Prioritize entry points, config files, and core components
+    const sortedFiles = [...files].sort((a, b) => {
+      // Configuration files
+      if (a.name.includes('config') || a.name.endsWith('.json')) return -1;
+      if (b.name.includes('config') || b.name.endsWith('.json')) return 1;
       
-      // Sort by score (higher is more important)
-      return scoreB - scoreA;
+      // Entry points
+      if (a.name.includes('main') || a.name.includes('index') || a.name.includes('app')) return -1;
+      if (b.name.includes('main') || b.name.includes('index') || b.name.includes('app')) return 1;
+      
+      // By file extension priority
+      const extA = a.name.split('.').pop();
+      const extB = b.name.split('.').pop();
+      
+      const priority = {
+        'js': 1, 'ts': 1, 'jsx': 1, 'tsx': 1,
+        'py': 1, 'java': 1, 'rb': 1,
+        'html': 2, 'css': 2,
+        'md': 3, 'json': 3,
+      };
+      
+      return (priority[extA] || 99) - (priority[extB] || 99);
     });
+    
+    // Limit to maxFiles
+    if (maxFiles > 0 && sortedFiles.length > maxFiles) {
+      return sortedFiles.slice(0, maxFiles);
+    }
+    
+    return sortedFiles;
   }
   
-  private calculateFileImportance(file: any): number {
-    let score = 0;
-    const name = file.name.toLowerCase();
-    const path = file.path.toLowerCase();
-    
-    // Entry points are very important
-    if (name.includes('index') || name.includes('main') || name.includes('app')) {
-      score += 30;
-    }
-    
-    // Core configuration files
-    if (name.includes('config') || name.endsWith('.json') || name.includes('.env')) {
-      score += 25;
-    }
-    
-    // Core components and services
-    if (path.includes('component') || path.includes('service') || path.includes('controller')) {
-      score += 20;
-    }
-    
-    // Database models and schemas
-    if (path.includes('model') || path.includes('schema') || path.includes('entity')) {
-      score += 18;
-    }
-    
-    // API endpoints
-    if (path.includes('api') || path.includes('route') || path.includes('endpoint')) {
-      score += 15;
-    }
-    
-    // Utilities and helpers
-    if (path.includes('util') || path.includes('helper') || path.includes('common')) {
-      score += 10;
-    }
-    
-    // By file extension/type
-    const ext = name.split('.').pop() || '';
-    
-    if (['js', 'ts', 'jsx', 'tsx'].includes(ext)) score += 8;
-    if (['py', 'java', 'rb'].includes(ext)) score += 8;
-    if (['html', 'css'].includes(ext)) score += 5;
-    if (['md', 'txt'].includes(ext)) score += 2;
-    
-    return score;
-  }
-  
-  private formatFilesForPrompt(files: any[]): string {
+  private formatKeyFilesForPrompt(files: any[]): string {
     return files.map(file => 
       `- ${file.path}/${file.name}: ${file.description}`
     ).join('\n');

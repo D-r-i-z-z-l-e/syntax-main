@@ -264,6 +264,8 @@ export function ConversationUI() {
                   currentLevel={architect.currentLevel}
                   isThinking={architect.isThinking}
                   error={architect.error}
+                  completedFiles={architect.completedFiles}
+                  totalFiles={architect.totalFiles}
                   onProceedToNextLevel={() => {
                     switch (architect.currentLevel) {
                       case 1:
