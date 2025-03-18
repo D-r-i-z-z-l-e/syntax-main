@@ -1,5 +1,15 @@
-export interface ArchitectLevel1 {
+export interface SpecialistVision {
+  role: string;
+  expertise: string;
   visionText: string;
+  projectStructure: {
+    rootFolder: FolderStructure;
+  };
+}
+
+export interface ArchitectLevel1 {
+  specialists: SpecialistVision[];
+  roles: string[];
 }
 
 export interface FileNode {
@@ -26,10 +36,12 @@ export interface FolderStructure {
 }
 
 export interface ArchitectLevel2 {
+  integratedVision: string;
   rootFolder: FolderStructure;
   dependencyTree: {
     files: FileNode[];
   };
+  resolutionNotes: string[];
 }
 
 export interface ComponentInfo {
@@ -91,4 +103,6 @@ export interface ArchitectState {
   error: string | null;
   completedFiles: number;
   totalFiles: number;
+  currentSpecialist: number;
+  totalSpecialists: number;
 }

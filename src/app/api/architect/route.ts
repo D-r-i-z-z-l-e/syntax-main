@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { architectService } from '../../../lib/services/architect.service';
+import { ArchitectLevel1 } from '../../../lib/types/architect';
 
 export async function POST(req: NextRequest) {
   try {
     console.log('=== ARCHITECT API REQUEST RECEIVED ===');
     
     const body = await req.json();
-    const { level, requirements, visionText, folderStructure } = body;
+    const { level, requirements, level1Output, level2Output } = body;
     
     console.log(`Architect API level ${level} request received`);
-    console.log(`Request body:`, JSON.stringify({
-      level,
-      requirementsCount: requirements?.length,
-      hasVisionText: !!visionText,
-      hasFolderStructure: !!folderStructure,
-      folderStructureType: folderStructure ? typeof folderStructure : 'undefined'
-    }));
     
     if (!requirements || !Array.isArray(requirements)) {
       console.log('ERROR: Valid requirements array is required');
@@ -25,42 +19,31 @@ export async function POST(req: NextRequest) {
     let result;
     switch (level) {
       case 1:
-        console.log('Generating level 1: Architectural Vision');
+        console.log('Generating level 1: Specialist Visions');
         result = await architectService.generateLevel1(requirements);
         break;
         
       case 2:
-        console.log('Generating level 2: Project Structure with Dependency Tree');
-        if (!visionText) {
-          console.log('ERROR: Vision text is required for level 2');
-          return NextResponse.json({ error: 'Vision text is required for level 2' }, { status: 400 });
+        console.log('Generating level 2: Integrated Vision and Structure');
+        if (!level1Output || !level1Output.specialists || !Array.isArray(level1Output.specialists)) {
+          console.log('ERROR: Valid level1Output with specialists array is required for level 2');
+          return NextResponse.json({ 
+            error: 'Valid level1Output with specialists array is required for level 2' 
+          }, { status: 400 });
         }
-        result = await architectService.generateLevel2(requirements, visionText);
+        result = await architectService.generateLevel2(requirements, level1Output);
         break;
         
       case 3:
         console.log('Generating level 3: Implementation Plans');
-        if (!visionText) {
-          console.log('ERROR: Vision text is required for level 3');
-          return NextResponse.json({ error: 'Vision text is required for level 3' }, { status: 400 });
-        }
-        
-        if (!folderStructure) {
-          console.log('ERROR: Missing folder structure for level 3');
+        if (!level2Output || !level2Output.rootFolder || !level2Output.dependencyTree) {
+          console.log('ERROR: Valid level2Output with rootFolder and dependencyTree is required for level 3');
           return NextResponse.json({ 
-            error: 'Missing required inputs for level 3: ["folder structure"]' 
+            error: 'Valid level2Output with rootFolder and dependencyTree is required for level 3' 
           }, { status: 400 });
         }
         
-        // Verify folderStructure has dependencyTree
-        if (!folderStructure.dependencyTree || !folderStructure.rootFolder) {
-          console.log('ERROR: Invalid folder structure format - missing dependencyTree');
-          return NextResponse.json({ 
-            error: 'Invalid folder structure format: must include both rootFolder and dependencyTree' 
-          }, { status: 400 });
-        }
-        
-        result = await architectService.generateLevel3(requirements, visionText, folderStructure);
+        result = await architectService.generateLevel3(requirements, level2Output);
         break;
         
       default:

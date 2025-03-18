@@ -1,5 +1,3 @@
-"use client";
-
 import { useRef, useEffect, useState } from 'react';
 import { useConversationStore } from '../../lib/stores/conversation';
 import { ProjectStructure } from './ProjectStructure';
@@ -266,6 +264,8 @@ export function ConversationUI() {
                   error={architect.error}
                   completedFiles={architect.completedFiles}
                   totalFiles={architect.totalFiles}
+                  currentSpecialist={architect.currentSpecialist}
+                  totalSpecialists={architect.totalSpecialists}
                   onProceedToNextLevel={() => {
                     switch (architect.currentLevel) {
                       case 1:

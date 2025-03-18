@@ -25,14 +25,12 @@ export async function POST(req: NextRequest) {
     let result;
     switch (level) {
       case 1:
-        // Level 1: Generate architectural vision
         console.log('Generating level 1: Architectural Vision');
         result = await architectService.generateLevel1(requirements);
         break;
         
       case 2:
-        // Level 2: Generate project structure based on vision
-        console.log('Generating level 2: Project Structure');
+        console.log('Generating level 2: Project Structure with Dependency Tree');
         if (!visionText) {
           console.log('ERROR: Vision text is required for level 2');
           return NextResponse.json({ error: 'Vision text is required for level 2' }, { status: 400 });
@@ -41,8 +39,7 @@ export async function POST(req: NextRequest) {
         break;
         
       case 3:
-        // Level 3: Generate implementation plan based on vision and structure
-        console.log('Generating level 3: Implementation Plan');
+        console.log('Generating level 3: Implementation Plans');
         if (!visionText) {
           console.log('ERROR: Vision text is required for level 3');
           return NextResponse.json({ error: 'Vision text is required for level 3' }, { status: 400 });
@@ -55,21 +52,15 @@ export async function POST(req: NextRequest) {
           }, { status: 400 });
         }
         
-        // Ensure folder structure has a rootFolder property
-        const normalizedFolderStructure = typeof folderStructure === 'object' && 'rootFolder' in folderStructure && folderStructure.rootFolder
-          ? folderStructure
-          : { 
-              rootFolder: typeof folderStructure === 'object' ? folderStructure : {
-                name: "project-root",
-                description: "Root directory for the project",
-                purpose: "Main project folder",
-                subfolders: []
-              }
-            };
+        // Verify folderStructure has dependencyTree
+        if (!folderStructure.dependencyTree || !folderStructure.rootFolder) {
+          console.log('ERROR: Invalid folder structure format - missing dependencyTree');
+          return NextResponse.json({ 
+            error: 'Invalid folder structure format: must include both rootFolder and dependencyTree' 
+          }, { status: 400 });
+        }
         
-        console.log('Proceeding with normalized folder structure');
-        
-        result = await architectService.generateLevel3(requirements, visionText, normalizedFolderStructure);
+        result = await architectService.generateLevel3(requirements, visionText, folderStructure);
         break;
         
       default:

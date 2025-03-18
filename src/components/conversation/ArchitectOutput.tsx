@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon, CheckIcon, BrainIcon, SearchIcon, LayersIcon, TerminalIcon } from 'lucide-react';
-import { ArchitectLevel2, FileContext } from '../../lib/types/architect';
+import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon, CheckIcon, BrainIcon, SearchIcon, LayersIcon, TerminalIcon, Users2Icon } from 'lucide-react';
+import { ArchitectLevel1, ArchitectLevel2, FileContext, SpecialistVision } from '../../lib/types/architect';
 
 interface ArchitectOutputProps {
-  level1Output: { visionText: string } | null;
+  level1Output: ArchitectLevel1 | null;
   level2Output: ArchitectLevel2 | null;
   level3Output: { implementationOrder: FileContext[] } | null;
   currentLevel: 1 | 2 | 3;
@@ -11,6 +11,8 @@ interface ArchitectOutputProps {
   error: string | null;
   completedFiles: number;
   totalFiles: number;
+  currentSpecialist: number;
+  totalSpecialists: number;
   onProceedToNextLevel: () => void;
 }
 
@@ -23,15 +25,18 @@ export function ArchitectOutput({
   error,
   completedFiles,
   totalFiles,
+  currentSpecialist,
+  totalSpecialists,
   onProceedToNextLevel
 }: ArchitectOutputProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFile, setExpandedFile] = useState<string | null>(null);
+  const [selectedSpecialist, setSelectedSpecialist] = useState<number | null>(null);
   
   const getButtonText = () => {
     switch (currentLevel) {
       case 1:
-        return 'Create Project Structure';
+        return 'Integrate Specialist Visions';
       case 2:
         return 'Generate Implementation Plan';
       case 3:
@@ -46,9 +51,9 @@ export function ArchitectOutput({
     
     switch (currentLevel) {
       case 1:
-        return !!level1Output?.visionText;
+        return !!level1Output?.specialists && level1Output.specialists.length > 0;
       case 2:
-        return !!level2Output?.rootFolder;
+        return !!level2Output?.rootFolder && !!level2Output?.integratedVision;
       case 3:
         return !!level3Output?.implementationOrder;
       default:
@@ -89,14 +94,14 @@ export function ArchitectOutput({
     );
   }
 
-  if (!level1Output && !isThinking) return null;
+  if ((!level1Output && !isThinking) || (!level1Output?.specialists && !isThinking && currentLevel === 1)) return null;
 
   return (
     <div className="w-full architect-card p-5 mb-5">
       <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center">
-        {currentLevel === 1 && <BrainIcon className="w-5 h-5 mr-2 text-blue-500" />}
-        {currentLevel === 2 && <FolderIcon className="w-5 h-5 mr-2 text-blue-500" />}
-        {currentLevel === 3 && <TerminalIcon className="w-5 h-5 mr-2 text-blue-500" />}
+        {currentLevel === 1 && <Users2Icon className="w-5 h-5 mr-2 text-blue-500" />}
+        {currentLevel === 2 && <BrainIcon className="w-5 h-5 mr-2 text-blue-500" />}
+        {currentLevel === 3 && <CodeIcon className="w-5 h-5 mr-2 text-blue-500" />}
         AI Architect - Phase {currentLevel}
       </h2>
       
@@ -119,11 +124,29 @@ export function ArchitectOutput({
         <div className="flex items-center justify-center space-x-3 py-8">
           <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-gray-600 font-medium">
-            {currentLevel === 1 && "Creating comprehensive architectural vision..."}
-            {currentLevel === 2 && "Designing complete project structure with dependency tree..."}
+            {currentLevel === 1 && (
+              <div className="flex flex-col items-center">
+                <span>Consulting with specialists...</span>
+                {totalSpecialists > 0 && (
+                  <div className="mt-2 w-full max-w-xs">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>{currentSpecialist} of {totalSpecialists} specialists</span>
+                      <span>{Math.round((currentSpecialist / totalSpecialists) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="h-2 rounded-full bg-blue-500"
+                        style={{ width: `${(currentSpecialist / totalSpecialists) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {currentLevel === 2 && "CTO is integrating specialist visions..."}
             {currentLevel === 3 && (
               <div className="flex flex-col items-center">
-                <span>Developing detailed implementation plans...</span>
+                <span>Generating implementation plans...</span>
                 {totalFiles > 0 && (
                   <div className="mt-2 w-full max-w-xs">
                     <div className="flex justify-between text-xs mb-1">
@@ -147,61 +170,177 @@ export function ArchitectOutput({
           {/* Phase Title */}
           <div className="text-center mb-4">
             <h3 className="text-lg font-semibold text-blue-700">
-              {currentLevel === 1 && "Architectural Vision"}
-              {currentLevel === 2 && "Complete Project Structure"}
+              {currentLevel === 1 && "Specialist Visions"}
+              {currentLevel === 2 && "Integrated Architecture"}
               {currentLevel === 3 && "Implementation Blueprint"}
             </h3>
             <p className="text-sm text-gray-500">
-              {currentLevel === 1 && "A comprehensive blueprint of the software architecture"}
-              {currentLevel === 2 && `Project skeleton with dependency tree (${level2Output?.dependencyTree?.files?.length || 0} files)`}
+              {currentLevel === 1 && `${level1Output?.specialists?.length || 0} specialists have provided their expert insights`}
+              {currentLevel === 2 && `CTO's unified architecture with dependency tree (${level2Output?.dependencyTree?.files?.length || 0} files)`}
               {currentLevel === 3 && `Detailed implementation instructions for ${level3Output?.implementationOrder?.length || 0} files`}
             </p>
           </div>
           
-          {/* Level 1: Architectural Vision */}
-          {currentLevel === 1 && level1Output && (
+          {/* Level 1: Specialist Visions */}
+          {currentLevel === 1 && level1Output?.specialists && (
             <div>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
-                    <BrainIcon className="w-4 h-4" />
+                    <Users2Icon className="w-4 h-4" />
                   </div>
                   <h3 className="text-base font-semibold text-gray-800">
-                    Comprehensive Architecture
-                  </h3>
-                </div>
-              </div>
-              
-              <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-5 max-h-[600px] overflow-y-auto border border-gray-200 prose prose-sm">
-                {level1Output.visionText.split('\n\n').map((paragraph, idx) => (
-                  <p key={idx} className="mb-4">{paragraph}</p>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Level 2: Project Structure */}
-          {currentLevel === 2 && level2Output && level2Output.rootFolder && (
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
-                    <LayersIcon className="w-4 h-4" />
-                  </div>
-                  <h3 className="text-base font-semibold text-gray-800">
-                    Project Structure with Dependencies
+                    Specialist Team
                   </h3>
                 </div>
                 <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
-                  {level2Output.dependencyTree?.files?.length || 0} files
+                  {level1Output.specialists.length} specialists
                 </div>
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-4 max-h-[600px] overflow-y-auto border border-gray-200">
-                {renderFolderStructure(level2Output.rootFolder)}
+              {/* Specialist selector tabs */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {level1Output.specialists.map((specialist, idx) => (
+                  <button
+                    key={idx}
+                    className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                      selectedSpecialist === idx 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    onClick={() => setSelectedSpecialist(idx)}
+                  >
+                    {specialist.role}
+                  </button>
+                ))}
+                <button
+                  className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                    selectedSpecialist === null 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  onClick={() => setSelectedSpecialist(null)}
+                >
+                  All Specialists
+                </button>
               </div>
               
-              <div className="mt-4">
+              {/* Selected specialist detail or all specialists */}
+              {selectedSpecialist !== null ? (
+                // Single specialist detail view
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="mb-3">
+                    <h4 className="text-base font-medium text-gray-900">{level1Output.specialists[selectedSpecialist].role}</h4>
+                    <p className="text-sm text-gray-600">{level1Output.specialists[selectedSpecialist].expertise}</p>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <h5 className="text-sm font-medium text-gray-800 mb-2">Vision</h5>
+                    <div className="text-sm text-gray-700 bg-white rounded-lg p-4 max-h-[300px] overflow-y-auto border border-gray-200 prose prose-sm">
+                      {level1Output.specialists[selectedSpecialist].visionText.split('\n\n').map((paragraph, idx) => (
+                        <p key={idx} className="mb-4">{paragraph}</p>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h5 className="text-sm font-medium text-gray-800 mb-2">Proposed Structure</h5>
+                    <div className="bg-white rounded-lg p-4 max-h-[300px] overflow-y-auto border border-gray-200">
+                      {renderFolderStructure(level1Output.specialists[selectedSpecialist].projectStructure.rootFolder)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // All specialists summary view
+                <div className="space-y-4">
+                  {level1Output.specialists.map((specialist, idx) => (
+                    <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-base font-medium text-gray-900">{specialist.role}</h4>
+                          <p className="text-sm text-gray-600">{specialist.expertise}</p>
+                        </div>
+                        <button
+                          className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1 rounded-full transition-colors"
+                          onClick={() => setSelectedSpecialist(idx)}
+                        >
+                          Full Details
+                        </button>
+                      </div>
+                      
+                      <div className="mt-3">
+                        <h5 className="text-xs font-medium text-gray-800 mb-1">Key Points</h5>
+                        <div className="text-xs text-gray-700 bg-white rounded p-3 border border-gray-100 line-clamp-3">
+                          {specialist.visionText.substring(0, 180)}...
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Level 2: Integrated Vision */}
+          {currentLevel === 2 && level2Output && (
+            <div className="space-y-6">
+              {/* Integrated Vision */}
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
+                      <BrainIcon className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-800">
+                      CTO's Integrated Vision
+                    </h3>
+                  </div>
+                </div>
+                
+                <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-5 max-h-[300px] overflow-y-auto border border-gray-200 prose prose-sm">
+                  {level2Output.integratedVision.split('\n\n').map((paragraph, idx) => (
+                    <p key={idx} className="mb-4">{paragraph}</p>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Resolution Notes */}
+              {level2Output.resolutionNotes && level2Output.resolutionNotes.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-800 mb-2">Resolution Notes</h4>
+                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-100">
+                    <ul className="list-disc pl-5 space-y-2">
+                      {level2Output.resolutionNotes.map((note, idx) => (
+                        <li key={idx} className="text-sm text-gray-700">{note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+              
+              {/* Project Structure */}
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
+                      <LayersIcon className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-800">
+                      Integrated Project Structure
+                    </h3>
+                  </div>
+                  <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
+                    {level2Output.dependencyTree?.files?.length || 0} files
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4 max-h-[300px] overflow-y-auto border border-gray-200">
+                  {renderFolderStructure(level2Output.rootFolder)}
+                </div>
+              </div>
+              
+              {/* Dependency Tree */}
+              <div>
                 <div className="mb-3 flex items-center">
                   <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
                     <CodeIcon className="w-4 h-4" />

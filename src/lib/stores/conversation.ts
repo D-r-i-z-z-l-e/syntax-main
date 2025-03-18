@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState, FileNode } from '../types/architect';
+import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState, FileNode, SpecialistVision } from '../types/architect';
 
 export interface Message {
   id: string;
@@ -81,14 +81,16 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     isThinking: false,
     error: null,
     completedFiles: 0,
-    totalFiles: 0
+    totalFiles: 0,
+    currentSpecialist: 0,
+    totalSpecialists: 0
   },
   
   generateArchitectLevel1: async () => {
     const state = get();
     const requirements = state.context.extractedInfo.requirements;
     
-    console.log('Starting architectural vision generation');
+    console.log('Starting specialist vision generation');
     
     if (!requirements?.length) {
       set(state => ({
@@ -112,7 +114,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           level2Output: null,
           level3Output: null,
           completedFiles: 0,
-          totalFiles: 0
+          totalFiles: 0,
+          currentSpecialist: 0,
+          totalSpecialists: 0
         }
       }));
       
@@ -127,31 +131,32 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to generate architectural vision: ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to generate specialist visions: ${response.statusText} - ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('Architectural vision generated successfully');
+      console.log('Specialist visions generated successfully');
       
-      if (!data.visionText) {
-        throw new Error('Invalid response from architect: missing vision text');
+      if (!data.specialists || !Array.isArray(data.specialists)) {
+        throw new Error('Invalid response from architect: missing specialists array');
       }
       
-      // Update state with level 1 output and move to level 2
+      // Update state with level 1 output
       set(state => ({
         architect: {
           ...state.architect,
           level1Output: data,
           currentLevel: 1,
-          isThinking: false
+          isThinking: false,
+          totalSpecialists: data.specialists.length
         }
       }));
     } catch (error) {
-      console.error('Error generating architectural vision:', error);
+      console.error('Error generating specialist visions:', error);
       set(state => ({
         architect: {
           ...state.architect,
-          error: error instanceof Error ? error.message : 'Failed to generate architectural vision',
+          error: error instanceof Error ? error.message : 'Failed to generate specialist visions',
           isThinking: false
         }
       }));
@@ -163,17 +168,17 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     const { level1Output } = state.architect;
     const requirements = state.context.extractedInfo.requirements;
     
-    console.log('Starting project structure generation with dependency tree');
+    console.log('Starting integrated vision and structure generation');
     
-    if (!level1Output?.visionText || !requirements?.length) {
+    if (!level1Output?.specialists || !Array.isArray(level1Output.specialists) || !requirements?.length) {
       const missing: string[] = [];
-      if (!level1Output?.visionText) missing.push('architectural vision');
+      if (!level1Output?.specialists) missing.push('specialist visions');
       if (!requirements?.length) missing.push('requirements');
       
       set(state => ({
         architect: {
           ...state.architect,
-          error: `Missing required input for project structure: ${missing.join(', ')}`
+          error: `Missing required input for integrated vision: ${missing.join(', ')}`
         }
       }));
       return;
@@ -200,20 +205,20 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         body: JSON.stringify({
           level: 2,
           requirements,
-          visionText: level1Output.visionText
+          level1Output
         }),
       });
       
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to generate project structure: ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to generate integrated vision: ${response.statusText} - ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('Project structure generated successfully with dependency tree');
+      console.log('Integrated vision and structure generated successfully');
       
-      if (!data.rootFolder || !data.dependencyTree) {
-        throw new Error('Invalid project structure response: missing rootFolder or dependencyTree');
+      if (!data.rootFolder || !data.dependencyTree || !data.integratedVision) {
+        throw new Error('Invalid level 2 response: missing rootFolder, dependencyTree, or integratedVision');
       }
       
       // Count total files in dependency tree
@@ -230,11 +235,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         }
       }));
     } catch (error) {
-      console.error('Error generating project structure:', error);
+      console.error('Error generating integrated vision:', error);
       set(state => ({
         architect: {
           ...state.architect,
-          error: error instanceof Error ? error.message : 'Failed to generate project structure',
+          error: error instanceof Error ? error.message : 'Failed to generate integrated vision',
           isThinking: false,
           currentLevel: 1
         }
@@ -244,14 +249,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   
   generateArchitectLevel3: async () => {
     const state = get();
-    const { level1Output, level2Output } = state.architect;
+    const { level2Output } = state.architect;
     const requirements = state.context.extractedInfo.requirements;
     
     console.log('Starting implementation plan generation based on dependency tree');
     
-    if (!level1Output?.visionText || !level2Output?.rootFolder || !level2Output?.dependencyTree || !requirements?.length) {
+    if (!level2Output?.rootFolder || !level2Output?.dependencyTree || !level2Output?.integratedVision || !requirements?.length) {
       const missing: string[] = [];
-      if (!level1Output?.visionText) missing.push('architectural vision');
+      if (!level2Output?.integratedVision) missing.push('integrated vision');
       if (!level2Output?.rootFolder) missing.push('project structure');
       if (!level2Output?.dependencyTree) missing.push('dependency tree');
       if (!requirements?.length) missing.push('requirements');
@@ -284,8 +289,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         body: JSON.stringify({
           level: 3,
           requirements,
-          visionText: level1Output.visionText,
-          folderStructure: level2Output
+          level2Output
         }),
       });
       
@@ -330,13 +334,13 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       
       const state = get();
       const requirements = state.context.extractedInfo.requirements;
-      const { level1Output, level2Output } = state.architect;
+      const { level2Output } = state.architect;
       
       // Validate all required inputs
-      if (!requirements?.length || !level1Output?.visionText || !level2Output?.rootFolder || !implementationPlan?.implementationOrder) {
+      if (!requirements?.length || !level2Output?.integratedVision || !level2Output?.rootFolder || !implementationPlan?.implementationOrder) {
         const missing = [];
         if (!requirements?.length) missing.push('requirements');
-        if (!level1Output?.visionText) missing.push('architectural vision');
+        if (!level2Output?.integratedVision) missing.push('integrated vision');
         if (!level2Output?.rootFolder) missing.push('project structure');
         if (!implementationPlan?.implementationOrder) missing.push('implementation plan');
         
@@ -348,7 +352,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requirements,
-          architectVision: level1Output.visionText,
+          architectVision: level2Output.integratedVision,
           folderStructure: level2Output,
           implementationPlan
         }),
@@ -375,7 +379,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           isThinking: false,
           error: null,
           completedFiles: 0,
-          totalFiles: 0
+          totalFiles: 0,
+          currentSpecialist: 0,
+          totalSpecialists: 0
         }
       });
     } catch (error) {
@@ -546,7 +552,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         isThinking: false,
         error: null,
         completedFiles: 0,
-        totalFiles: 0
+        totalFiles: 0,
+        currentSpecialist: 0,
+        totalSpecialists: 0
       },
     });
   },

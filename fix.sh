@@ -1,3 +1,17 @@
+#!/bin/bash
+
+echo "Starting implementation of enhanced prompts for more detailed project structures..."
+
+# Create a backup directory
+mkdir -p ./backups
+
+# Backup current architect service file
+echo "Creating backup of architect service..."
+cp src/lib/services/architect.service.ts ./backups/architect.service.ts.bak 2>/dev/null || true
+
+# Update architect service with enhanced prompts
+echo "Updating architect service with enhanced prompts..."
+cat > src/lib/services/architect.service.ts << 'EOF'
 import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, FileContext, FileNode, FolderStructure, SpecialistVision } from '../types/architect';
 
 class ArchitectService {
@@ -854,3 +868,14 @@ Please generate a COMPREHENSIVE implementation context for this specific file, l
 }
 
 export const architectService = ArchitectService.getInstance();
+EOF
+
+echo "Script execution completed successfully!"
+echo "The architect service has been updated with significantly enhanced prompts that will:"
+echo "1. Generate much more detailed project structures from each specialist"
+echo "2. Produce comprehensive production-ready project structures from the CTO"
+echo "3. Create exhaustive implementation contexts for each file"
+echo ""
+echo "The changes are now ready to use. Run your application to see the improved results."
+echo ""
+echo "Note: The token usage will likely increase as the responses will be much more detailed."
