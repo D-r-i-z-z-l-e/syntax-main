@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon, CheckIcon, BrainIcon, SearchIcon, LayersIcon, TerminalIcon, Users2Icon } from 'lucide-react';
-import { ArchitectLevel1, ArchitectLevel2, FileContext, SpecialistVision } from '../../lib/types/architect';
+import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon, CheckIcon, BrainIcon, SearchIcon, LayersIcon, TerminalIcon, Users2Icon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, FileImplementation, SpecialistVision } from '../../lib/types/architect';
+import { IDEContainer } from '../ide/IDEContainer';
 
 interface ArchitectOutputProps {
   level1Output: ArchitectLevel1 | null;
   level2Output: ArchitectLevel2 | null;
-  level3Output: { implementationOrder: FileContext[] } | null;
+  level3Output: ArchitectLevel3 | null;
   currentLevel: 1 | 2 | 3;
   isThinking: boolean;
   error: string | null;
@@ -13,8 +14,26 @@ interface ArchitectOutputProps {
   totalFiles: number;
   currentSpecialist: number;
   totalSpecialists: number;
+  generatedFiles: FileImplementation[];
+  activeFile: FileImplementation | null;
+  setActiveFile: (file: FileImplementation | null) => void;
   onProceedToNextLevel: () => void;
 }
+
+const REPORT_SECTIONS = [
+  { id: 'executive-summary', title: 'Executive Summary' },
+  { id: 'system-architecture', title: 'System Architecture Overview' },
+  { id: 'technology-stack', title: 'Technology Stack' },
+  { id: 'component-architecture', title: 'Component Architecture' },
+  { id: 'data-architecture', title: 'Data Architecture' },
+  { id: 'security-architecture', title: 'Security Architecture' },
+  { id: 'integration-architecture', title: 'Integration Architecture' },
+  { id: 'deployment-architecture', title: 'Deployment Architecture' },
+  { id: 'performance-considerations', title: 'Performance Considerations' },
+  { id: 'development-guidelines', title: 'Development Guidelines' },
+  { id: 'testing-strategy', title: 'Testing Strategy' },
+  { id: 'operational-considerations', title: 'Operational Considerations' }
+];
 
 export function ArchitectOutput({
   level1Output,
@@ -27,25 +46,51 @@ export function ArchitectOutput({
   totalFiles,
   currentSpecialist,
   totalSpecialists,
+  generatedFiles,
+  activeFile,
+  setActiveFile,
   onProceedToNextLevel
 }: ArchitectOutputProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFile, setExpandedFile] = useState<string | null>(null);
   const [selectedSpecialist, setSelectedSpecialist] = useState<number | null>(null);
+  const [showIDE, setShowIDE] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['executive-summary']));
+  const [visibleVisionSection, setVisibleVisionSection] = useState('all');
+  
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  };
   
   const getButtonText = () => {
     switch (currentLevel) {
       case 1:
         return 'Integrate Specialist Visions';
       case 2:
-        return 'Generate Implementation Plan';
+        return 'Generate Code';
       case 3:
-        return 'Build Project';
+        return 'Open IDE';
       default:
         return 'Proceed';
     }
   };
 
+  const handleProceed = () => {
+    if (currentLevel === 3) {
+      setShowIDE(true);
+    } else {
+      onProceedToNextLevel();
+    }
+  };
+  
   const canProceedToNextLevel = () => {
     if (isThinking) return false;
     
@@ -55,12 +100,12 @@ export function ArchitectOutput({
       case 2:
         return !!level2Output?.rootFolder && !!level2Output?.integratedVision;
       case 3:
-        return !!level3Output?.implementationOrder;
+        return !!level3Output?.implementations && level3Output.implementations.length > 0;
       default:
         return false;
     }
   };
-
+  
   const getTotalFileCount = (rootFolder: any): number => {
     let count = 0;
     
@@ -69,7 +114,7 @@ export function ArchitectOutput({
       count += rootFolder.files.length;
     }
     
-    // Recursively count files in subfolders
+    // Count files in subfolders
     if (rootFolder.subfolders && Array.isArray(rootFolder.subfolders)) {
       for (const subfolder of rootFolder.subfolders) {
         count += getTotalFileCount(subfolder);
@@ -79,11 +124,94 @@ export function ArchitectOutput({
     return count;
   };
   
-  const filteredImplementationOrder = level3Output?.implementationOrder?.filter(file => 
+  const filteredImplementations = level3Output?.implementations?.filter(file => 
     file.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     file.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
     file.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  const renderVisionSections = (visionText: string) => {
+    if (visibleVisionSection !== 'all') {
+      // Find the relevant section based on pattern matching
+      const sections = extractSections(visionText);
+      if (sections[visibleVisionSection]) {
+        return (
+          <div className="text-sm text-gray-700 bg-white rounded-lg p-5 max-h-[600px] overflow-y-auto border border-gray-200 prose prose-sm">
+            {sections[visibleVisionSection].split('\n\n').map((paragraph, idx) => (
+              <p key={idx} className="mb-4">{paragraph}</p>
+            ))}
+          </div>
+        );
+      }
+    }
+    
+    // Default - show all content
+    return (
+      <div className="text-sm text-gray-700 bg-white rounded-lg p-5 max-h-[600px] overflow-y-auto border border-gray-200 prose prose-sm">
+        {visionText.split('\n\n').map((paragraph, idx) => (
+          <p key={idx} className="mb-4">{paragraph}</p>
+        ))}
+      </div>
+    );
+  };
+  
+  const extractSections = (visionText: string) => {
+    const sections: Record<string, string> = {};
+    let currentSection = 'executive-summary';
+    let currentContent: string[] = [];
+    
+    // Split by lines to process section by section
+    const lines = visionText.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Check if this line is a section header
+      const sectionMatch = /^(#+)\s+(.+)$/i.test(line) || 
+                          /^([A-Z][A-Za-z\s]+):$/i.test(line) ||
+                          /^([0-9]+\.\s+[A-Z][A-Za-z\s]+)$/i.test(line);
+                          
+      if (sectionMatch) {
+        // Save the previous section
+        if (currentContent.length > 0) {
+          sections[currentSection] = currentContent.join('\n');
+        }
+        
+        // Start a new section
+        // Simplify the section name for mapping
+        const sectionName = line.toLowerCase()
+          .replace(/^#+\s+/, '')
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .trim();
+          
+        // Find the best matching predefined section
+        currentSection = findBestMatchingSection(sectionName) || sectionName;
+        currentContent = [line];
+      } else {
+        currentContent.push(line);
+      }
+    }
+    
+    // Save the last section
+    if (currentContent.length > 0) {
+      sections[currentSection] = currentContent.join('\n');
+    }
+    
+    return sections;
+  };
+  
+  const findBestMatchingSection = (sectionName: string): string | null => {
+    // Map the input section to our predefined sections
+    for (const section of REPORT_SECTIONS) {
+      const normalizedSectionId = section.title.toLowerCase().replace(/\s+/g, '-');
+      if (sectionName.includes(normalizedSectionId) || 
+          normalizedSectionId.includes(sectionName)) {
+        return section.id;
+      }
+    }
+    return null;
+  };
 
   if (error) {
     return (
@@ -91,6 +219,17 @@ export function ArchitectOutput({
         <h2 className="text-sm font-semibold text-red-900 mb-2">Error</h2>
         <p className="text-sm text-red-700">{error}</p>
       </div>
+    );
+  }
+
+  if (showIDE) {
+    return (
+      <IDEContainer 
+        files={generatedFiles} 
+        onClose={() => setShowIDE(false)}
+        activeFile={activeFile}
+        setActiveFile={setActiveFile}
+      />
     );
   }
 
@@ -143,10 +282,10 @@ export function ArchitectOutput({
                 )}
               </div>
             )}
-            {currentLevel === 2 && "CTO is integrating specialist visions..."}
+            {currentLevel === 2 && "CTO is developing comprehensive architecture specification..."}
             {currentLevel === 3 && (
               <div className="flex flex-col items-center">
-                <span>Generating implementation plans...</span>
+                <span>Generating code implementations...</span>
                 {totalFiles > 0 && (
                   <div className="mt-2 w-full max-w-xs">
                     <div className="flex justify-between text-xs mb-1">
@@ -171,13 +310,13 @@ export function ArchitectOutput({
           <div className="text-center mb-4">
             <h3 className="text-lg font-semibold text-blue-700">
               {currentLevel === 1 && "Specialist Visions"}
-              {currentLevel === 2 && "Integrated Architecture"}
-              {currentLevel === 3 && "Implementation Blueprint"}
+              {currentLevel === 2 && "CTO's Comprehensive Architecture"}
+              {currentLevel === 3 && "Generated Code"}
             </h3>
             <p className="text-sm text-gray-500">
               {currentLevel === 1 && `${level1Output?.specialists?.length || 0} specialists have provided their expert insights`}
-              {currentLevel === 2 && `CTO's unified architecture with dependency tree (${level2Output?.dependencyTree?.files?.length || 0} files)`}
-              {currentLevel === 3 && `Detailed implementation instructions for ${level3Output?.implementationOrder?.length || 0} files`}
+              {currentLevel === 2 && `Complete architectural specification with ${level2Output?.dependencyTree?.files?.length || 0} files`}
+              {currentLevel === 3 && `Complete code implementation for ${level3Output?.implementations?.length || 0} files`}
             </p>
           </div>
           
@@ -227,7 +366,7 @@ export function ArchitectOutput({
               
               {/* Selected specialist detail or all specialists */}
               {selectedSpecialist !== null ? (
-                // Single specialist detail view
+                // Detailed view of the selected specialist
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="mb-3">
                     <h4 className="text-base font-medium text-gray-900">{level1Output.specialists[selectedSpecialist].role}</h4>
@@ -251,7 +390,7 @@ export function ArchitectOutput({
                   </div>
                 </div>
               ) : (
-                // All specialists summary view
+                // Summary view of all specialists
                 <div className="space-y-4">
                   {level1Output.specialists.map((specialist, idx) => (
                     <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -281,10 +420,38 @@ export function ArchitectOutput({
             </div>
           )}
 
-          {/* Level 2: Integrated Vision */}
+          {/* Level 2: Enhanced CTO Architecture Report */}
           {currentLevel === 2 && level2Output && (
             <div className="space-y-6">
-              {/* Integrated Vision */}
+              {/* Section Tabs */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button
+                  className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                    visibleVisionSection === 'all' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  onClick={() => setVisibleVisionSection('all')}
+                >
+                  Full Report
+                </button>
+                
+                {REPORT_SECTIONS.map((section) => (
+                  <button
+                    key={section.id}
+                    className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                      visibleVisionSection === section.id 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    onClick={() => setVisibleVisionSection(section.id)}
+                  >
+                    {section.title}
+                  </button>
+                ))}
+              </div>
+            
+              {/* Integrated Vision - Enhanced Report Display */}
               <div>
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center">
@@ -292,101 +459,127 @@ export function ArchitectOutput({
                       <BrainIcon className="w-4 h-4" />
                     </div>
                     <h3 className="text-base font-semibold text-gray-800">
-                      CTO's Integrated Vision
+                      Comprehensive Architecture Specification
                     </h3>
                   </div>
                 </div>
                 
-                <div className="text-sm text-gray-700 bg-gray-50 rounded-lg p-5 max-h-[300px] overflow-y-auto border border-gray-200 prose prose-sm">
-                  {level2Output.integratedVision.split('\n\n').map((paragraph, idx) => (
-                    <p key={idx} className="mb-4">{paragraph}</p>
-                  ))}
-                </div>
+                {renderVisionSections(level2Output.integratedVision)}
               </div>
               
               {/* Resolution Notes */}
               {level2Output.resolutionNotes && level2Output.resolutionNotes.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-800 mb-2">Resolution Notes</h4>
-                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-100">
-                    <ul className="list-disc pl-5 space-y-2">
-                      {level2Output.resolutionNotes.map((note, idx) => (
-                        <li key={idx} className="text-sm text-gray-700">{note}</li>
-                      ))}
-                    </ul>
+                <div>
+                  <div className="flex items-center justify-between cursor-pointer mb-2" onClick={() => toggleSection('resolution-notes')}>
+                    <div className="flex items-center">
+                      <div className="w-7 h-7 rounded-full bg-yellow-500 text-white flex items-center justify-center mr-3">
+                        <LayersIcon className="w-4 h-4" />
+                      </div>
+                      <h3 className="text-base font-semibold text-gray-800">
+                        Architectural Decisions & Trade-offs
+                      </h3>
+                    </div>
+                    {expandedSections.has('resolution-notes') ? 
+                      <ChevronUpIcon className="w-5 h-5 text-gray-500" /> : 
+                      <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                    }
                   </div>
+                  
+                  {expandedSections.has('resolution-notes') && (
+                    <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-100 mt-2">
+                      <ul className="list-disc pl-5 space-y-4">
+                        {level2Output.resolutionNotes.map((note, idx) => (
+                          <li key={idx} className="text-sm text-gray-700">{note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
               
               {/* Project Structure */}
               <div>
-                <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center justify-between cursor-pointer mb-2" onClick={() => toggleSection('project-structure')}>
                   <div className="flex items-center">
                     <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
                       <LayersIcon className="w-4 h-4" />
                     </div>
                     <h3 className="text-base font-semibold text-gray-800">
-                      Integrated Project Structure
+                      Project Structure
                     </h3>
                   </div>
-                  <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
-                    {level2Output.dependencyTree?.files?.length || 0} files
-                  </div>
+                  {expandedSections.has('project-structure') ? 
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" /> : 
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  }
                 </div>
                 
-                <div className="bg-gray-50 rounded-lg p-4 max-h-[300px] overflow-y-auto border border-gray-200">
-                  {renderFolderStructure(level2Output.rootFolder)}
-                </div>
+                {expandedSections.has('project-structure') && (
+                  <div className="bg-gray-50 rounded-lg p-4 max-h-[300px] overflow-y-auto border border-gray-200 mt-2">
+                    <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full inline-block mb-3">
+                      {level2Output.dependencyTree?.files?.length || 0} files
+                    </div>
+                    {renderFolderStructure(level2Output.rootFolder)}
+                  </div>
+                )}
               </div>
               
               {/* Dependency Tree */}
               <div>
-                <div className="mb-3 flex items-center">
-                  <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
-                    <CodeIcon className="w-4 h-4" />
+                <div className="flex items-center justify-between cursor-pointer mb-2" onClick={() => toggleSection('dependency-tree')}>
+                  <div className="flex items-center">
+                    <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3">
+                      <CodeIcon className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-800">
+                      Implementation Order
+                    </h3>
                   </div>
-                  <h3 className="text-base font-semibold text-gray-800">
-                    Implementation Order
-                  </h3>
+                  {expandedSections.has('dependency-tree') ? 
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" /> : 
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  }
                 </div>
                 
-                <div className="bg-gray-50 rounded-lg p-4 max-h-[300px] overflow-y-auto border border-gray-200">
-                  <div className="space-y-2">
-                    {level2Output.dependencyTree?.files?.sort((a, b) => a.implementationOrder - b.implementationOrder)
-                      .map((file, index) => (
-                        <div key={index} className="flex items-start">
-                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center mr-2 flex-shrink-0 text-xs font-medium">
-                            {file.implementationOrder}
-                          </div>
-                          <div>
-                            <div className="flex items-center">
-                              <FileIcon className="h-4 w-4 mr-2 text-gray-500" />
-                              <span className="font-medium text-gray-900">{file.path}/{file.name}</span>
+                {expandedSections.has('dependency-tree') && (
+                  <div className="bg-gray-50 rounded-lg p-4 max-h-[300px] overflow-y-auto border border-gray-200 mt-2">
+                    <div className="space-y-2">
+                      {level2Output.dependencyTree?.files?.sort((a, b) => a.implementationOrder - b.implementationOrder)
+                        .map((file, index) => (
+                          <div key={index} className="flex items-start">
+                            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center mr-2 flex-shrink-0 text-xs font-medium">
+                              {file.implementationOrder}
                             </div>
-                            <p className="text-xs text-gray-600 mt-1">{file.description}</p>
-                            {file.dependencies.length > 0 && (
-                              <div className="mt-1">
-                                <span className="text-xs text-gray-500">Depends on: </span>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {file.dependencies.map((dep, idx) => (
-                                    <span key={idx} className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">
-                                      {dep}
-                                    </span>
-                                  ))}
-                                </div>
+                            <div>
+                              <div className="flex items-center">
+                                <FileIcon className="h-4 w-4 mr-2 text-gray-500" />
+                                <span className="font-medium text-gray-900">{file.path}/{file.name}</span>
                               </div>
-                            )}
+                              <p className="text-xs text-gray-600 mt-1">{file.description}</p>
+                              {file.dependencies.length > 0 && (
+                                <div className="mt-1">
+                                  <span className="text-xs text-gray-500">Depends on: </span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {file.dependencies.map((dep, idx) => (
+                                      <span key={idx} className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                                        {dep}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Level 3: Implementation Plan */}
-          {currentLevel === 3 && level3Output && level3Output.implementationOrder && (
+          {/* Level 3: Code Implementations */}
+          {currentLevel === 3 && level3Output && level3Output.implementations && (
             <div>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center">
@@ -394,11 +587,11 @@ export function ArchitectOutput({
                     <CodeIcon className="w-4 h-4" />
                   </div>
                   <h3 className="text-base font-semibold text-gray-800">
-                    Implementation Details
+                    Generated Code
                   </h3>
                 </div>
                 <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
-                  {level3Output.implementationOrder.length} files
+                  {level3Output.implementations.length} files
                 </div>
               </div>
               
@@ -417,9 +610,9 @@ export function ArchitectOutput({
               </div>
               
               <div className="bg-gray-50 rounded-lg p-4 max-h-[600px] overflow-y-auto border border-gray-200">
-                {filteredImplementationOrder && filteredImplementationOrder.length > 0 ? (
+                {filteredImplementations && filteredImplementations.length > 0 ? (
                   <div className="space-y-4">
-                    {filteredImplementationOrder.map((file, index) => (
+                    {filteredImplementations.map((file, index) => (
                       <div 
                         key={index} 
                         className={`mb-4 last:mb-0 text-sm border-b border-gray-200 pb-4 last:border-b-0 ${
@@ -436,7 +629,7 @@ export function ArchitectOutput({
                               {file.path}/{file.name}
                             </p>
                             <p className="text-xs text-gray-500 mt-1">
-                              Type: {file.type} | Purpose: {file.purpose}
+                              Type: {file.type} | Language: {file.language}
                             </p>
                           </div>
                           <div className="text-xs bg-gray-100 rounded-md px-2 py-0.5 text-gray-500">
@@ -448,6 +641,7 @@ export function ArchitectOutput({
                           <div className="mt-3 ml-6 text-sm">
                             <div className="bg-white p-3 rounded border border-gray-200 mb-3">
                               <p className="text-gray-600">{file.description}</p>
+                              <p className="text-gray-600 mt-1">{file.purpose}</p>
                             </div>
                             
                             {file.dependencies && file.dependencies.length > 0 && (
@@ -462,85 +656,19 @@ export function ArchitectOutput({
                                 </div>
                               </div>
                             )}
-
-                            {file.imports && file.imports.length > 0 && (
-                              <div className="mt-2 mb-3">
-                                <p className="text-xs font-medium text-gray-700 mb-1">Imports:</p>
-                                <div className="bg-gray-50 p-2 rounded text-xs font-mono text-gray-600">
-                                  {file.imports.map((imp, idx) => (
-                                    <div key={idx}>{imp}</div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                             
-                            {file.components && file.components.length > 0 && (
-                              <div className="mt-3 mb-3">
-                                <p className="text-xs font-medium text-gray-700 mb-1">Components:</p>
-                                <div className="space-y-2">
-                                  {file.components.map((component, idx) => (
-                                    <div key={idx} className="text-xs bg-gray-100 p-2 rounded border border-gray-200">
-                                      <p className="font-medium text-gray-800">{component.name} ({component.type})</p>
-                                      <p className="text-gray-600 mt-1">{component.details}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {file.implementations && file.implementations.length > 0 && (
-                              <div className="mt-3 mb-3">
-                                <p className="text-xs font-medium text-gray-700 mb-1">Implementations:</p>
-                                <div className="space-y-3">
-                                  {file.implementations.map((impl, idx) => (
-                                    <div key={idx} className="bg-white p-2 rounded border border-gray-200">
-                                      <p className="font-medium text-gray-800 text-xs">{impl.name}: {impl.type}</p>
-                                      <p className="text-gray-600 text-xs mt-1">{impl.description}</p>
-                                      
-                                      {impl.parameters && impl.parameters.length > 0 && (
-                                        <div className="mt-2">
-                                          <p className="text-xs font-medium text-gray-600">Parameters:</p>
-                                          <ul className="text-xs pl-4 list-disc">
-                                            {impl.parameters.map((param, pidx) => (
-                                              <li key={pidx}>
-                                                <span className="font-mono">{param.name}</span> ({param.type}): {param.description}
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        </div>
-                                      )}
-                                      
-                                      {impl.returnType && (
-                                        <p className="text-xs text-gray-600 mt-1">
-                                          Returns: <span className="font-mono">{impl.returnType}</span>
-                                        </p>
-                                      )}
-                                      
-                                      {impl.logic && (
-                                        <div className="mt-2 border-t border-gray-100 pt-2">
-                                          <p className="text-xs font-medium text-gray-600">Implementation:</p>
-                                          <p className="text-xs text-gray-600">{impl.logic}</p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {file.testingStrategy && (
-                              <div className="mt-2 mb-3">
-                                <p className="text-xs font-medium text-gray-700 mb-1">Testing Strategy:</p>
-                                <p className="text-xs bg-gray-100 p-2 rounded text-gray-600">{file.testingStrategy}</p>
-                              </div>
-                            )}
-                            
-                            {file.additionalContext && (
-                              <div className="mt-2 text-xs italic bg-yellow-50 p-2 rounded text-gray-600 border border-yellow-100">
-                                <p className="font-medium text-yellow-700 mb-1">Additional Notes:</p>
-                                {file.additionalContext}
-                              </div>
-                            )}
+                            <div className="flex justify-end mt-2">
+                              <button
+                                onClick={() => {
+                                  setActiveFile(file);
+                                  setShowIDE(true);
+                                }}
+                                className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1 rounded transition-colors flex items-center"
+                              >
+                                <CodeIcon className="w-3 h-3 mr-1" />
+                                View Code
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -548,7 +676,7 @@ export function ArchitectOutput({
                   </div>
                 ) : (
                   <div className="text-center py-4 text-gray-500">
-                    {searchTerm ? "No files match your search" : "No implementation details found"}
+                    {searchTerm ? "No files match your search" : "No code implementations found"}
                   </div>
                 )}
               </div>
@@ -556,7 +684,7 @@ export function ArchitectOutput({
           )}
 
           <button
-            onClick={onProceedToNextLevel}
+            onClick={handleProceed}
             disabled={!canProceedToNextLevel()}
             className={`w-full mt-6 ${canProceedToNextLevel() 
               ? 'bg-blue-600 hover:bg-blue-700 text-white' 

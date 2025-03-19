@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         break;
         
       case 3:
-        console.log('Generating level 3: Implementation Plans');
+        console.log('Generating level 3: Code Implementations');
         if (!level2Output || !level2Output.rootFolder || !level2Output.dependencyTree) {
           console.log('ERROR: Valid level2Output with rootFolder and dependencyTree is required for level 3');
           return NextResponse.json({ 

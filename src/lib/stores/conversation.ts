@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState, FileNode, SpecialistVision } from '../types/architect';
+import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState, FileImplementation, FileNode, ProjectStructure, SpecialistVision } from '../types/architect';
 
 export interface Message {
   id: string;
@@ -39,6 +39,8 @@ export interface ConversationStore {
   projectStructure: any | null;
   isGeneratingStructure: boolean;
   architect: ArchitectState;
+  generatedFiles: FileImplementation[];
+  activeFile: FileImplementation | null;
   initializeProject: () => Promise<void>;
   loadConversation: (conversationId: string) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
@@ -46,6 +48,7 @@ export interface ConversationStore {
   generateArchitectLevel2: () => Promise<void>;
   generateArchitectLevel3: () => Promise<void>;
   generateProjectStructure: (implementationPlan: ArchitectLevel3) => Promise<void>;
+  setActiveFile: (file: FileImplementation | null) => void;
   reset: () => void;
 }
 
@@ -85,6 +88,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     currentSpecialist: 0,
     totalSpecialists: 0
   },
+  generatedFiles: [],
+  activeFile: null,
   
   generateArchitectLevel1: async () => {
     const state = get();
@@ -103,7 +108,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Reset architect state and set to thinking
+      // Reset architect state and start thinking
       set(state => ({
         architect: {
           ...state.architect,
@@ -141,7 +146,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error('Invalid response from architect: missing specialists array');
       }
       
-      // Update state with level 1 output
+      // Update state with the generated specialist visions
       set(state => ({
         architect: {
           ...state.architect,
@@ -185,7 +190,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Set to thinking for level 2
+      // Reset level 2+ and start thinking
       set(state => ({
         architect: {
           ...state.architect,
@@ -221,10 +226,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error('Invalid level 2 response: missing rootFolder, dependencyTree, or integratedVision');
       }
       
-      // Count total files in dependency tree
+      // Get the total number of files for progress tracking
       const totalFiles = data.dependencyTree.files ? data.dependencyTree.files.length : 0;
       
-      // Update state with level 2 output and move to level 3
+      // Update state with the CTO's integrated vision and structure
       set(state => ({
         architect: {
           ...state.architect,
@@ -252,7 +257,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     const { level2Output } = state.architect;
     const requirements = state.context.extractedInfo.requirements;
     
-    console.log('Starting implementation plan generation based on dependency tree');
+    console.log('Starting code generation based on dependency tree');
     
     if (!level2Output?.rootFolder || !level2Output?.dependencyTree || !level2Output?.integratedVision || !requirements?.length) {
       const missing: string[] = [];
@@ -264,14 +269,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       set(state => ({
         architect: {
           ...state.architect,
-          error: `Missing required input for implementation plan: ${JSON.stringify(missing)}`
+          error: `Missing required input for code generation: ${JSON.stringify(missing)}`
         }
       }));
       return;
     }
     
     try {
-      // Set to thinking for level 3
+      // Reset level 3 and start thinking
       set(state => ({
         architect: {
           ...state.architect,
@@ -295,32 +300,33 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to generate implementation plan: ${response.statusText} - ${errorText}`);
+        throw new Error(`Failed to generate code implementations: ${response.statusText} - ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('Implementation plan generated successfully');
+      console.log('Code implementations generated successfully');
       
-      if (!data.implementationOrder || !Array.isArray(data.implementationOrder)) {
-        throw new Error('Invalid implementation plan: missing or invalid implementationOrder');
+      if (!data.implementations || !Array.isArray(data.implementations)) {
+        throw new Error('Invalid code implementation response: missing or invalid implementations');
       }
       
-      // Update state with level 3 output
+      // Update state with the generated code implementations
       set(state => ({
         architect: {
           ...state.architect,
           level3Output: data,
           currentLevel: 3,
           isThinking: false,
-          completedFiles: data.implementationOrder.length
-        }
+          completedFiles: data.implementations.length
+        },
+        generatedFiles: data.implementations
       }));
     } catch (error) {
-      console.error('Error generating implementation plan:', error);
+      console.error('Error generating code implementations:', error);
       set(state => ({
         architect: {
           ...state.architect,
-          error: error instanceof Error ? error.message : 'Failed to generate implementation plan',
+          error: error instanceof Error ? error.message : 'Failed to generate code implementations',
           isThinking: false,
           currentLevel: 2
         }
@@ -336,13 +342,13 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const requirements = state.context.extractedInfo.requirements;
       const { level2Output } = state.architect;
       
-      // Validate all required inputs
-      if (!requirements?.length || !level2Output?.integratedVision || !level2Output?.rootFolder || !implementationPlan?.implementationOrder) {
+      // Validate inputs
+      if (!requirements?.length || !level2Output?.integratedVision || !level2Output?.rootFolder || !implementationPlan?.implementations) {
         const missing = [];
         if (!requirements?.length) missing.push('requirements');
         if (!level2Output?.integratedVision) missing.push('integrated vision');
         if (!level2Output?.rootFolder) missing.push('project structure');
-        if (!implementationPlan?.implementationOrder) missing.push('implementation plan');
+        if (!implementationPlan?.implementations) missing.push('implementation plan');
         
         throw new Error(`Missing required inputs for project construction: ${missing.join(', ')}`);
       }
@@ -366,7 +372,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const data = await response.json();
       console.log('Project structure successfully generated');
       
-      // Reset architect state and set project structure
+      // Update state with the project structure
       set({ 
         projectStructure: data.structure, 
         isGeneratingStructure: false,
@@ -391,6 +397,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         isGeneratingStructure: false,
       });
     }
+  },
+
+  setActiveFile: (file: FileImplementation | null) => {
+    set({ activeFile: file });
   },
   
   initializeProject: async () => {
@@ -556,6 +566,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         currentSpecialist: 0,
         totalSpecialists: 0
       },
+      generatedFiles: [],
+      activeFile: null,
     });
   },
 }));

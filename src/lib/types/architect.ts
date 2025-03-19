@@ -44,54 +44,20 @@ export interface ArchitectLevel2 {
   resolutionNotes: string[];
 }
 
-export interface ComponentInfo {
-  name: string;
-  type: string;
-  purpose: string;
-  dependencies: string[];
-  details: string;
-}
-
-export interface ParameterInfo {
-  name: string;
-  type: string;
-  description: string;
-  validation?: string;
-  defaultValue?: string;
-}
-
-export interface ImplementationInfo {
-  name: string;
-  type: string;
-  description: string;
-  parameters?: ParameterInfo[];
-  returnType?: string;
-  logic: string;
-}
-
-export interface FileContext {
+export interface FileImplementation {
   name: string;
   path: string;
   type: string;
   description: string;
   purpose: string;
   dependencies: string[];
-  imports: string[];
-  components: ComponentInfo[];
-  implementations: ImplementationInfo[];
-  styling?: string;
-  configuration?: string;
-  stateManagement?: string;
-  dataFlow?: string;
-  errorHandling?: string;
-  testingStrategy?: string;
-  integrationPoints?: string;
-  edgeCases?: string;
-  additionalContext: string;
+  language: string;
+  code: string;
+  testCode?: string;
 }
 
 export interface ArchitectLevel3 {
-  implementationOrder: FileContext[];
+  implementations: FileImplementation[];
 }
 
 export interface ArchitectState {
@@ -105,4 +71,24 @@ export interface ArchitectState {
   totalFiles: number;
   currentSpecialist: number;
   totalSpecialists: number;
+}
+
+export interface ProjectFile {
+  id: string;
+  name: string;
+  path: string;
+  content: string;
+  language: string;
+}
+
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  path: string;
+  description?: string;
+  children: (ProjectFile | ProjectFolder)[];
+}
+
+export interface ProjectStructure {
+  rootFolder: ProjectFolder;
 }

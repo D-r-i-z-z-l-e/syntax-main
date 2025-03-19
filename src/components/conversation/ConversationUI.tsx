@@ -2,7 +2,8 @@ import { useRef, useEffect, useState } from 'react';
 import { useConversationStore } from '../../lib/stores/conversation';
 import { ProjectStructure } from './ProjectStructure';
 import { ArchitectOutput } from './ArchitectOutput';
-import { FolderIcon, LayoutIcon, SendIcon, RefreshCwIcon } from 'lucide-react';
+import { FolderIcon, LayoutIcon, SendIcon, RefreshCwIcon, Code } from 'lucide-react';
+import { IDEContainer } from '../ide/IDEContainer';
 
 export function ConversationUI() {
   const {
@@ -15,6 +16,9 @@ export function ConversationUI() {
     projectStructure,
     isGeneratingStructure,
     architect,
+    generatedFiles,
+    activeFile,
+    setActiveFile,
     generateArchitectLevel1,
     generateArchitectLevel2,
     generateArchitectLevel3,
@@ -22,6 +26,7 @@ export function ConversationUI() {
   } = useConversationStore();
 
   const [inputText, setInputText] = useState('');
+  const [showIDE, setShowIDE] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,7 +36,6 @@ export function ConversationUI() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || isLoading) return;
-
     const message = inputText;
     setInputText('');
     await sendMessage(message);
@@ -94,6 +98,18 @@ export function ConversationUI() {
 
   const requirements = context.extractedInfo.requirements || [];
   const showArchitect = requirements.length > 0;
+  
+  // If IDE is visible, render it in full screen
+  if (showIDE && generatedFiles.length > 0) {
+    return (
+      <IDEContainer 
+        files={generatedFiles} 
+        onClose={() => setShowIDE(false)}
+        activeFile={activeFile}
+        setActiveFile={setActiveFile}
+      />
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -111,7 +127,6 @@ export function ConversationUI() {
           )}
         </div>
       )}
-
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
@@ -122,15 +137,25 @@ export function ConversationUI() {
               {getPhaseDescription(context.currentPhase)}
             </p>
           </div>
-          <button
-            onClick={reset}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
-          >
-            <RefreshCwIcon className="w-4 h-4 mr-2" />
-            New Conversation
-          </button>
+          <div className="flex items-center space-x-3">
+            {generatedFiles.length > 0 && (
+              <button
+                onClick={() => setShowIDE(true)}
+                className="px-4 py-2 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center"
+              >
+                <Code className="w-4 h-4 mr-2" />
+                Open IDE
+              </button>
+            )}
+            <button
+              onClick={reset}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
+            >
+              <RefreshCwIcon className="w-4 h-4 mr-2" />
+              New Conversation
+            </button>
+          </div>
         </div>
-
         {/* Understanding Metrics */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
           <div className="max-w-4xl mx-auto">
@@ -188,7 +213,6 @@ export function ConversationUI() {
             </div>
           </div>
         </div>
-
         {/* Central Content Area */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col lg:flex-row gap-8">
@@ -266,6 +290,9 @@ export function ConversationUI() {
                   totalFiles={architect.totalFiles}
                   currentSpecialist={architect.currentSpecialist}
                   totalSpecialists={architect.totalSpecialists}
+                  generatedFiles={generatedFiles}
+                  activeFile={activeFile}
+                  setActiveFile={setActiveFile}
                   onProceedToNextLevel={() => {
                     switch (architect.currentLevel) {
                       case 1:
@@ -275,7 +302,7 @@ export function ConversationUI() {
                         generateArchitectLevel3();
                         break;
                       case 3:
-                        generateProjectStructure(architect.level3Output!);
+                        setShowIDE(true);
                         break;
                     }
                   }}
@@ -284,7 +311,6 @@ export function ConversationUI() {
             </div>
           </div>
         </div>
-
         {/* Error Display */}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-6 mb-4 rounded-r-lg">
@@ -308,7 +334,6 @@ export function ConversationUI() {
             </div>
           </div>
         )}
-
         {/* Input Form */}
         <div className="border-t border-gray-200 bg-white px-6 py-5 shadow-[0_-1px_2px_rgba(0,0,0,0.03)]">
           <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
