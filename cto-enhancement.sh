@@ -1,3 +1,165 @@
+#!/bin/bash
+
+set -e  # Exit on any error
+
+echo "===== Starting CTO Implementation Book Enhancement Script ====="
+
+# Create backup directory
+mkdir -p ./backups
+timestamp=$(date +%Y%m%d%H%M%S)
+backup_dir="./backups/cto-enhancement-$timestamp"
+mkdir -p $backup_dir
+
+echo "Creating backups in $backup_dir..."
+
+# Backup key files
+cp src/lib/services/architect.service.ts $backup_dir/
+cp src/lib/types/architect.ts $backup_dir/
+cp src/lib/stores/conversation.ts $backup_dir/
+cp src/components/conversation/ArchitectOutput.tsx $backup_dir/
+
+echo "Updating architect types..."
+
+# Update architect.ts
+cat > src/lib/types/architect.ts << 'EOL'
+export interface SpecialistVision {
+  role: string;
+  expertise: string;
+  visionText: string;
+  projectStructure: {
+    rootFolder: FolderStructure;
+  };
+}
+
+export interface ArchitectLevel1 {
+  specialists: SpecialistVision[];
+  roles: string[];
+}
+
+export interface FileNode {
+  name: string;
+  path: string;
+  description: string;
+  purpose: string;
+  dependencies: string[];
+  dependents: string[];
+  implementationOrder: number;
+  type: string;
+}
+
+export interface FolderStructure {
+  name: string;
+  description: string;
+  purpose: string;
+  files?: {
+    name: string;
+    description: string;
+    purpose: string;
+  }[];
+  subfolders?: FolderStructure[];
+}
+
+export interface BookOutline {
+  title: string;
+  introduction: string;
+  chapters: Array<{
+    title: string;
+    sections: string[];
+  }>;
+}
+
+export interface ChapterContent {
+  content: string;
+  continuationContext: {
+    chapterTitle: string;
+    sections: string[];
+    completedContent: string;
+    remainingSections: string[];
+  } | null;
+}
+
+export interface ImplementationBook {
+  title: string;
+  introduction: string;
+  chapters: Array<{
+    title: string;
+    content: string;
+    isComplete: boolean;
+  }>;
+  isComplete: boolean;
+  lastUpdated: string;
+}
+
+export interface ArchitectLevel2 {
+  integratedVision: string;
+  rootFolder: FolderStructure;
+  dependencyTree: {
+    files: FileNode[];
+  };
+  resolutionNotes: string[];
+  implementationBook?: ImplementationBook;
+}
+
+export interface FileImplementation {
+  name: string;
+  path: string;
+  type: string;
+  description: string;
+  purpose: string;
+  dependencies: string[];
+  language: string;
+  code: string;
+  testCode?: string;
+}
+
+export interface ArchitectLevel3 {
+  implementations: FileImplementation[];
+}
+
+export interface ArchitectState {
+  level1Output: ArchitectLevel1 | null;
+  level2Output: ArchitectLevel2 | null;
+  level3Output: ArchitectLevel3 | null;
+  currentLevel: 1 | 2 | 3;
+  isThinking: boolean;
+  error: string | null;
+  completedFiles: number;
+  totalFiles: number;
+  currentSpecialist: number;
+  totalSpecialists: number;
+  bookGenerationProgress?: {
+    totalChapters: number;
+    completedChapters: number;
+    currentChapter: string;
+    progress: number;
+  };
+}
+
+export interface ProjectFile {
+  id: string;
+  name: string;
+  path: string;
+  content: string;
+  language: string;
+}
+
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  path: string;
+  description?: string;
+  children: (ProjectFile | ProjectFolder)[];
+}
+
+export interface ProjectStructure {
+  rootFolder: ProjectFolder;
+}
+EOL
+
+echo "Updating architect service..."
+
+# Create the enhanced architect.service.ts
+cat > src/lib/services/architect.service.ts << 'EOL'
 import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, BookOutline, ChapterContent, FileImplementation, FileNode, FolderStructure, ImplementationBook, SpecialistVision } from '../types/architect';
 
 class ArchitectService {
@@ -1411,3 +1573,1285 @@ This file requires a complete, production-ready implementation. Your code should
 }
 
 export const architectService = ArchitectService.getInstance();
+EOL
+
+echo "Updating conversation store..."
+
+# Update the conversation store
+cat > src/lib/stores/conversation.ts << 'EOL'
+import { create } from 'zustand';
+import { v4 as uuidv4 } from 'uuid';
+import { ArchitectLevel1, ArchitectLevel2, ArchitectLevel3, ArchitectState, FileImplementation, FileNode, ProjectStructure, SpecialistVision } from '../types/architect';
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+export interface UnderstandingMetrics {
+  coreConcept: number;
+  requirements: number;
+  technical: number;
+  constraints: number;
+  userContext: number;
+}
+
+export interface ConversationContext {
+  currentPhase: 'initial' | 'requirements' | 'clarification' | 'complete';
+  extractedInfo: { 
+    requirements?: string[];
+    technicalDetails?: string[];
+    constraints?: string[];
+  };
+  understanding: UnderstandingMetrics;
+  overallUnderstanding: number;
+}
+
+export interface ConversationStore {
+  messages: Message[];
+  context: ConversationContext;
+  isLoading: boolean;
+  error: string | null;
+  projectId: string | null;
+  conversationId: string | null;
+  projectStructure: any | null;
+  isGeneratingStructure: boolean;
+  architect: ArchitectState;
+  generatedFiles: FileImplementation[];
+  activeFile: FileImplementation | null;
+  initializeProject: () => Promise<void>;
+  loadConversation: (conversationId: string) => Promise<void>;
+  sendMessage: (content: string) => Promise<void>;
+  generateArchitectLevel1: () => Promise<void>;
+  generateArchitectLevel2: () => Promise<void>;
+  generateArchitectLevel3: () => Promise<void>;
+  generateImplementationBook: () => Promise<void>;
+  generateProjectStructure: (implementationPlan: ArchitectLevel3) => Promise<void>;
+  setActiveFile: (file: FileImplementation | null) => void;
+  reset: () => void;
+}
+
+export const useConversationStore = create<ConversationStore>((set, get) => ({
+  messages: [],
+  context: {
+    currentPhase: 'initial',
+    extractedInfo: {
+      requirements: [],
+      technicalDetails: [],
+      constraints: [],
+    },
+    understanding: {
+      coreConcept: 0,
+      requirements: 0,
+      technical: 0,
+      constraints: 0,
+      userContext: 0,
+    },
+    overallUnderstanding: 0,
+  },
+  isLoading: false,
+  error: null,
+  projectId: null,
+  conversationId: null,
+  projectStructure: null,
+  isGeneratingStructure: false,
+  architect: {
+    level1Output: null,
+    level2Output: null,
+    level3Output: null,
+    currentLevel: 1,
+    isThinking: false,
+    error: null,
+    completedFiles: 0,
+    totalFiles: 0,
+    currentSpecialist: 0,
+    totalSpecialists: 0,
+    bookGenerationProgress: undefined
+  },
+  generatedFiles: [],
+  activeFile: null,
+  
+  generateArchitectLevel1: async () => {
+    const state = get();
+    const requirements = state.context.extractedInfo.requirements;
+    
+    console.log('Starting specialist vision generation');
+    
+    if (!requirements?.length) {
+      set(state => ({
+        architect: {
+          ...state.architect,
+          error: 'No requirements available for the architect'
+        }
+      }));
+      return;
+    }
+    
+    try {
+      // Reset architect state and start processing
+      set(state => ({
+        architect: {
+          ...state.architect,
+          isThinking: true,
+          error: null,
+          currentLevel: 1,
+          level1Output: null,
+          level2Output: null,
+          level3Output: null,
+          completedFiles: 0,
+          totalFiles: 0,
+          currentSpecialist: 0,
+          totalSpecialists: 0,
+          bookGenerationProgress: undefined
+        }
+      }));
+      
+      const response = await fetch('/api/architect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: 1,
+          requirements
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to generate specialist visions: ${response.statusText} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Specialist visions generated successfully');
+      
+      if (!data.specialists || !Array.isArray(data.specialists)) {
+        throw new Error('Invalid response from architect: missing specialists array');
+      }
+      
+      // Update state with generated specialists
+      set(state => ({
+        architect: {
+          ...state.architect,
+          level1Output: data,
+          currentLevel: 1,
+          isThinking: false,
+          totalSpecialists: data.specialists.length
+        }
+      }));
+    } catch (error) {
+      console.error('Error generating specialist visions:', error);
+      set(state => ({
+        architect: {
+          ...state.architect,
+          error: error instanceof Error ? error.message : 'Failed to generate specialist visions',
+          isThinking: false
+        }
+      }));
+    }
+  },
+  
+  generateArchitectLevel2: async () => {
+    const state = get();
+    const { level1Output } = state.architect;
+    const requirements = state.context.extractedInfo.requirements;
+    
+    console.log('Starting integrated vision and structure generation');
+    
+    if (!level1Output?.specialists || !Array.isArray(level1Output.specialists) || !requirements?.length) {
+      const missing: string[] = [];
+      if (!level1Output?.specialists) missing.push('specialist visions');
+      if (!requirements?.length) missing.push('requirements');
+      
+      set(state => ({
+        architect: {
+          ...state.architect,
+          error: `Missing required input for integrated vision: ${missing.join(', ')}`
+        }
+      }));
+      return;
+    }
+    
+    try {
+      // Update state to show processing
+      set(state => ({
+        architect: {
+          ...state.architect,
+          isThinking: true,
+          error: null,
+          currentLevel: 2,
+          level2Output: null,
+          level3Output: null,
+          completedFiles: 0,
+          totalFiles: 0,
+          bookGenerationProgress: undefined
+        }
+      }));
+      
+      const response = await fetch('/api/architect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: 2,
+          requirements,
+          level1Output
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to generate integrated vision: ${response.statusText} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Integrated vision and structure generated successfully');
+      
+      if (!data.rootFolder || !data.dependencyTree || !data.integratedVision) {
+        throw new Error('Invalid level 2 response: missing rootFolder, dependencyTree, or integratedVision');
+      }
+      
+      // Calculate total files
+      const totalFiles = data.dependencyTree.files ? data.dependencyTree.files.length : 0;
+      
+      // Update state with generated architecture
+      set(state => ({
+        architect: {
+          ...state.architect,
+          level2Output: data,
+          currentLevel: 2,
+          isThinking: false,
+          totalFiles
+        }
+      }));
+    } catch (error) {
+      console.error('Error generating integrated vision:', error);
+      set(state => ({
+        architect: {
+          ...state.architect,
+          error: error instanceof Error ? error.message : 'Failed to generate integrated vision',
+          isThinking: false,
+          currentLevel: 1
+        }
+      }));
+    }
+  },
+  
+  generateImplementationBook: async () => {
+    const state = get();
+    const { level2Output } = state.architect;
+    const requirements = state.context.extractedInfo.requirements;
+    
+    if (!level2Output || !requirements?.length) {
+      set(state => ({
+        architect: {
+          ...state.architect,
+          error: 'Missing integrated vision or requirements for implementation book generation'
+        }
+      }));
+      return;
+    }
+    
+    console.log('Starting implementation book generation');
+    
+    try {
+      // Update state to show book generation in progress
+      set(state => ({
+        architect: {
+          ...state.architect,
+          isThinking: true,
+          error: null,
+          bookGenerationProgress: {
+            totalChapters: 0,
+            completedChapters: 0,
+            currentChapter: 'Initializing',
+            progress: 0
+          }
+        }
+      }));
+      
+      // Start the background generation process
+      const response = await fetch('/api/book-generation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requirements,
+          level2Output,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to start book generation: ${response.statusText} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Update state with book generation started
+      set(state => ({
+        architect: {
+          ...state.architect,
+          isThinking: false,
+          bookGenerationProgress: {
+            totalChapters: data.totalChapters || 0,
+            completedChapters: 0,
+            currentChapter: data.currentChapter || 'Starting',
+            progress: 0
+          }
+        }
+      }));
+      
+      // Poll for updates - in a real implementation, you'd use WebSockets
+      const pollInterval = setInterval(async () => {
+        try {
+          const pollResponse = await fetch(`/api/book-generation-status?id=${data.generationId}`);
+          if (pollResponse.ok) {
+            const statusData = await pollResponse.json();
+            
+            // Update progress
+            set(state => ({
+              architect: {
+                ...state.architect,
+                bookGenerationProgress: {
+                  totalChapters: statusData.totalChapters,
+                  completedChapters: statusData.completedChapters,
+                  currentChapter: statusData.currentChapter,
+                  progress: statusData.progress
+                }
+              }
+            }));
+            
+            // If complete, update the level2Output with the book
+            if (statusData.isComplete) {
+              clearInterval(pollInterval);
+              
+              if (statusData.book) {
+                set(state => ({
+                  architect: {
+                    ...state.architect,
+                    level2Output: {
+                      ...state.architect.level2Output!,
+                      implementationBook: statusData.book
+                    }
+                  }
+                }));
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error polling book generation status:', error);
+        }
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error starting implementation book generation:', error);
+      set(state => ({
+        architect: {
+          ...state.architect,
+          error: error instanceof Error ? error.message : 'Failed to generate implementation book',
+          isThinking: false,
+          bookGenerationProgress: undefined
+        }
+      }));
+    }
+  },
+  
+  generateArchitectLevel3: async () => {
+    const state = get();
+    const { level2Output } = state.architect;
+    const requirements = state.context.extractedInfo.requirements;
+    
+    console.log('Starting code generation based on dependency tree');
+    
+    if (!level2Output?.rootFolder || !level2Output?.dependencyTree || !level2Output?.integratedVision || !requirements?.length) {
+      const missing: string[] = [];
+      if (!level2Output?.integratedVision) missing.push('integrated vision');
+      if (!level2Output?.rootFolder) missing.push('project structure');
+      if (!level2Output?.dependencyTree) missing.push('dependency tree');
+      if (!requirements?.length) missing.push('requirements');
+      
+      set(state => ({
+        architect: {
+          ...state.architect,
+          error: `Missing required input for code generation: ${JSON.stringify(missing)}`
+        }
+      }));
+      return;
+    }
+    
+    try {
+      // Update state to show processing
+      set(state => ({
+        architect: {
+          ...state.architect,
+          isThinking: true,
+          error: null,
+          currentLevel: 3,
+          level3Output: null,
+          completedFiles: 0
+        }
+      }));
+      
+      const response = await fetch('/api/architect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: 3,
+          requirements,
+          level2Output
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to generate code implementations: ${response.statusText} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Code implementations generated successfully');
+      
+      if (!data.implementations || !Array.isArray(data.implementations)) {
+        throw new Error('Invalid code implementation response: missing or invalid implementations');
+      }
+      
+      // Update state with generated implementations
+      set(state => ({
+        architect: {
+          ...state.architect,
+          level3Output: data,
+          currentLevel: 3,
+          isThinking: false,
+          completedFiles: data.implementations.length
+        },
+        generatedFiles: data.implementations
+      }));
+    } catch (error) {
+      console.error('Error generating code implementations:', error);
+      set(state => ({
+        architect: {
+          ...state.architect,
+          error: error instanceof Error ? error.message : 'Failed to generate code implementations',
+          isThinking: false,
+          currentLevel: 2
+        }
+      }));
+    }
+  },
+  
+  generateProjectStructure: async (implementationPlan: ArchitectLevel3) => {
+    try {
+      set({ isGeneratingStructure: true, error: null });
+      
+      const state = get();
+      const requirements = state.context.extractedInfo.requirements;
+      const { level2Output } = state.architect;
+      
+      // Validate required inputs
+      if (!requirements?.length || !level2Output?.integratedVision || !level2Output?.rootFolder || !implementationPlan?.implementations) {
+        const missing = [];
+        if (!requirements?.length) missing.push('requirements');
+        if (!level2Output?.integratedVision) missing.push('integrated vision');
+        if (!level2Output?.rootFolder) missing.push('project structure');
+        if (!implementationPlan?.implementations) missing.push('implementation plan');
+        
+        throw new Error(`Missing required inputs for project construction: ${missing.join(', ')}`);
+      }
+      
+      const response = await fetch('/api/project-structure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requirements,
+          architectVision: level2Output.integratedVision,
+          folderStructure: level2Output,
+          implementationPlan
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to construct project: ${response.statusText} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Project structure successfully generated');
+      
+      // Update state with the generated project structure
+      set({ 
+        projectStructure: data.structure, 
+        isGeneratingStructure: false,
+        architect: {
+          ...state.architect,
+          currentLevel: 1,
+          level1Output: null,
+          level2Output: null,
+          level3Output: null,
+          isThinking: false,
+          error: null,
+          completedFiles: 0,
+          totalFiles: 0,
+          currentSpecialist: 0,
+          totalSpecialists: 0,
+          bookGenerationProgress: undefined
+        }
+      });
+    } catch (error) {
+      console.error('Error constructing project:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to construct project',
+        isGeneratingStructure: false,
+      });
+    }
+  },
+
+  setActiveFile: (file: FileImplementation | null) => {
+    set({ activeFile: file });
+  },
+  
+  initializeProject: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      const response = await fetch('/api/project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'New Project' }),
+      });
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log('Project initialized:', data);
+      set({
+        projectId: data.project.id,
+        conversationId: data.conversation.id,
+        messages: [],
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error('Error initializing project:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to initialize project',
+        isLoading: false,
+      });
+    }
+  },
+  
+  loadConversation: async (conversationId: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      const response = await fetch(`/api/conversation?id=${conversationId}`, {
+        method: 'GET',
+      });
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+      const data = await response.json();
+      set({
+        messages: data.messages.map((msg: any) => ({
+          id: msg.id,
+          conversationId: msg.conversationId,
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.createdAt).getTime(),
+        })),
+        conversationId,
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load conversation',
+        isLoading: false,
+      });
+    }
+  },
+  
+  sendMessage: async (content: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const conversationId = get().conversationId || uuidv4();
+      const newMessage: Message = {
+        id: uuidv4(),
+        conversationId,
+        role: 'user',
+        content,
+        timestamp: Date.now(),
+      };
+      set(state => ({
+        messages: [...state.messages, newMessage],
+      }));
+      const response = await fetch('/api/conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...get().messages, newMessage],
+          context: get().context,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log('API Response:', data);
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      const assistantMessage: Message = {
+        id: uuidv4(),
+        conversationId,
+        role: 'assistant',
+        content: data.response,
+        timestamp: Date.now(),
+      };
+      set(state => ({
+        messages: [...state.messages, assistantMessage],
+        context: {
+          ...state.context,
+          currentPhase: data.extractedContext.nextPhase || state.context.currentPhase,
+          extractedInfo: {
+            requirements: [
+              ...(state.context.extractedInfo.requirements || []),
+              ...(data.extractedContext.requirements || []),
+            ],
+            technicalDetails: [
+              ...(state.context.extractedInfo.technicalDetails || []),
+              ...(data.extractedContext.technicalDetails || []),
+            ],
+            constraints: state.context.extractedInfo.constraints || [],
+          },
+          understanding: data.extractedContext.understandingUpdate || state.context.understanding,
+          overallUnderstanding: data.extractedContext.overallUnderstanding || state.context.overallUnderstanding,
+        },
+        isLoading: false,
+      }));
+    } catch (error) {
+      console.error('Error in sendMessage:', error);
+      set({
+        error: error instanceof Error ? error.message : 'An error occurred',
+        isLoading: false,
+      });
+    }
+  },
+  
+  reset: () => {
+    set({
+      messages: [],
+      context: {
+        currentPhase: 'initial',
+        extractedInfo: {
+          requirements: [],
+          technicalDetails: [],
+          constraints: [],
+        },
+        understanding: {
+          coreConcept: 0,
+          requirements: 0,
+          technical: 0,
+          constraints: 0,
+          userContext: 0,
+        },
+        overallUnderstanding: 0,
+      },
+      isLoading: false,
+      error: null,
+      projectId: null,
+      conversationId: null,
+      projectStructure: null,
+      isGeneratingStructure: false,
+      architect: {
+        level1Output: null,
+        level2Output: null,
+        level3Output: null,
+        currentLevel: 1,
+        isThinking: false,
+        error: null,
+        completedFiles: 0,
+        totalFiles: 0,
+        currentSpecialist: 0,
+        totalSpecialists: 0,
+        bookGenerationProgress: undefined
+      },
+      generatedFiles: [],
+      activeFile: null,
+    });
+  },
+}));
+EOL
+
+echo "Creating book generation API route..."
+
+# Create API handler for book generation
+mkdir -p src/app/api/book-generation
+cat > src/app/api/book-generation/route.ts << 'EOL'
+import { NextRequest, NextResponse } from 'next/server';
+import { architectService } from '../../../lib/services/architect.service';
+import { v4 as uuidv4 } from 'uuid';
+
+// In-memory storage for book generation status
+// In a production app, you'd use a database
+const bookGenerations = new Map();
+
+export async function POST(req: NextRequest) {
+  try {
+    const { requirements, level2Output } = await req.json();
+
+    if (!requirements || !Array.isArray(requirements) || !level2Output) {
+      return NextResponse.json(
+        { error: 'Valid requirements and level2Output are required' },
+        { status: 400 }
+      );
+    }
+
+    const generationId = uuidv4();
+    
+    // Initialize generation status
+    bookGenerations.set(generationId, {
+      status: 'initializing',
+      progress: 0,
+      totalChapters: 0,
+      completedChapters: 0,
+      currentChapter: 'Initializing',
+      startedAt: new Date(),
+      lastUpdated: new Date(),
+      error: null,
+      book: null
+    });
+
+    // Start book generation in the background
+    architectService.startBookGeneration(
+      requirements,
+      level2Output,
+      (progress) => {
+        // Update status with the progress information
+        const currentStatus = bookGenerations.get(generationId);
+        if (currentStatus) {
+          bookGenerations.set(generationId, {
+            ...currentStatus,
+            ...progress,
+            status: progress.error ? 'error' : (progress.progress >= 100 ? 'complete' : 'in-progress'),
+            lastUpdated: new Date()
+          });
+        }
+      }
+    ).catch(error => {
+      console.error('Error in book generation:', error);
+      const currentStatus = bookGenerations.get(generationId);
+      if (currentStatus) {
+        bookGenerations.set(generationId, {
+          ...currentStatus,
+          status: 'error',
+          error: error.message || 'Unknown error occurred',
+          lastUpdated: new Date()
+        });
+      }
+    });
+
+    // Return the generation ID for status polling
+    return NextResponse.json({
+      generationId,
+      status: 'initializing',
+      message: 'Book generation started',
+      totalChapters: 0,
+      completedChapters: 0,
+      currentChapter: 'Initializing'
+    });
+    
+  } catch (error) {
+    console.error('Error starting book generation:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'An unexpected error occurred' },
+      { status: 500 }
+    );
+  }
+}
+EOL
+
+mkdir -p src/app/api/book-generation-status
+cat > src/app/api/book-generation-status/route.ts << 'EOL'
+import { NextRequest, NextResponse } from 'next/server';
+
+// Accessing the same in-memory storage from the book-generation route
+// In a production app, you'd use a database
+declare global {
+  var bookGenerations: Map<string, any>;
+}
+
+if (!global.bookGenerations) {
+  global.bookGenerations = new Map();
+}
+
+const bookGenerations = global.bookGenerations;
+
+export async function GET(req: NextRequest) {
+  try {
+    const url = new URL(req.url);
+    const generationId = url.searchParams.get('id');
+
+    if (!generationId) {
+      return NextResponse.json(
+        { error: 'Generation ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const generationStatus = bookGenerations.get(generationId);
+    if (!generationStatus) {
+      return NextResponse.json(
+        { error: 'Generation not found' },
+        { status: 404 }
+      );
+    }
+
+    // Return the current status
+    return NextResponse.json({
+      generationId,
+      status: generationStatus.status,
+      progress: generationStatus.progress,
+      totalChapters: generationStatus.totalChapters,
+      completedChapters: generationStatus.completedChapters,
+      currentChapter: generationStatus.currentChapter,
+      startedAt: generationStatus.startedAt,
+      lastUpdated: generationStatus.lastUpdated,
+      error: generationStatus.error,
+      isComplete: generationStatus.status === 'complete',
+      book: generationStatus.book
+    });
+    
+  } catch (error) {
+    console.error('Error checking book generation status:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'An unexpected error occurred' },
+      { status: 500 }
+    );
+  }
+}
+EOL
+
+echo "Creating Book UI component..."
+
+# Create a component to view the implementation book
+mkdir -p src/components/book
+cat > src/components/book/ImplementationBook.tsx << 'EOL'
+import React, { useState } from 'react';
+import { Book, ChevronDown, ChevronUp, ChevronRight, FileText, BookOpen, Download } from 'lucide-react';
+import { ImplementationBook } from '../../lib/types/architect';
+
+interface ImplementationBookViewerProps {
+  book: ImplementationBook;
+  onClose: () => void;
+}
+
+export function ImplementationBookViewer({ book, onClose }: ImplementationBookViewerProps) {
+  const [expandedChapters, setExpandedChapters] = useState<Set<number>>(new Set([0]));
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const toggleChapter = (index: number) => {
+    setExpandedChapters(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const handleDownloadBook = () => {
+    // Create book markdown content
+    let content = `# ${book.title}\n\n`;
+    content += book.introduction + '\n\n';
+    content += '## Table of Contents\n';
+    
+    book.chapters.forEach((chapter, index) => {
+      content += `${index + 1}. ${chapter.title}\n`;
+    });
+    
+    content += '\n\n';
+    
+    book.chapters.forEach((chapter, index) => {
+      content += `# ${index + 1}. ${chapter.title}\n\n`;
+      content += chapter.content + '\n\n';
+    });
+    
+    // Create and download the file
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = book.title.replace(/\s+/g, '-').toLowerCase() + '.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Filter chapters if search term is provided
+  const filteredChapters = searchTerm ? 
+    book.chapters.filter(chapter => 
+      chapter.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      chapter.content.toLowerCase().includes(searchTerm.toLowerCase())
+    ) : 
+    book.chapters;
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 flex flex-col">
+      {/* Header */}
+      <div className="border-b px-4 py-3 flex justify-between items-center bg-gray-50">
+        <div className="flex items-center">
+          <BookOpen className="w-5 h-5 mr-2 text-blue-600" />
+          <h2 className="font-semibold text-gray-800">{book.title}</h2>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          <button 
+            className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 text-sm rounded flex items-center"
+            onClick={handleDownloadBook}
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            Download Book
+          </button>
+          
+          <button 
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
+            onClick={onClose}
+            title="Close"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+      
+      {/* Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Table of Contents */}
+        <div className="w-1/4 border-r overflow-y-auto p-4">
+          <div className="mb-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search chapters..."
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <h3 className="text-lg font-semibold mb-2">Table of Contents</h3>
+          
+          <div className="space-y-1">
+            {filteredChapters.map((chapter, index) => (
+              <div key={index} className="cursor-pointer">
+                <div 
+                  className="flex items-center py-2 px-2 hover:bg-gray-100 rounded"
+                  onClick={() => toggleChapter(index)}
+                >
+                  {expandedChapters.has(index) ? 
+                    <ChevronDown className="w-4 h-4 mr-1" /> : 
+                    <ChevronRight className="w-4 h-4 mr-1" />
+                  }
+                  <span>{index + 1}. {chapter.title}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Chapter Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-3xl mx-auto">
+            <h1 className="text-3xl font-bold mb-6">{book.title}</h1>
+            
+            <div className="prose prose-blue max-w-none">
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-4">Introduction</h2>
+                <div className="whitespace-pre-wrap">
+                  {book.introduction.split('\n\n').map((paragraph, i) => (
+                    <p key={i} className="mb-4">{paragraph}</p>
+                  ))}
+                </div>
+              </div>
+              
+              {filteredChapters.map((chapter, index) => (
+                <div 
+                  key={index} 
+                  id={`chapter-${index}`}
+                  className={`mb-10 p-4 border rounded-lg ${expandedChapters.has(index) ? '' : 'border-dashed'}`}
+                >
+                  <div 
+                    className="flex items-center cursor-pointer"
+                    onClick={() => toggleChapter(index)}
+                  >
+                    {expandedChapters.has(index) ? 
+                      <ChevronDown className="w-5 h-5 mr-2" /> : 
+                      <ChevronRight className="w-5 h-5 mr-2" />
+                    }
+                    <h2 className="text-2xl font-bold">{index + 1}. {chapter.title}</h2>
+                  </div>
+                  
+                  {expandedChapters.has(index) && (
+                    <div className="mt-4 whitespace-pre-wrap">
+                      {chapter.content.split('\n\n').map((paragraph, i) => {
+                        // Check if paragraph is a heading
+                        if (paragraph.startsWith('# ')) {
+                          return <h2 key={i} className="text-xl font-semibold mt-6 mb-4">{paragraph.substring(2)}</h2>;
+                        } else if (paragraph.startsWith('## ')) {
+                          return <h3 key={i} className="text-lg font-semibold mt-5 mb-3">{paragraph.substring(3)}</h3>;
+                        } else if (paragraph.startsWith('### ')) {
+                          return <h4 key={i} className="text-md font-semibold mt-4 mb-2">{paragraph.substring(4)}</h4>;
+                        }
+                        
+                        // Check if paragraph is a code block
+                        if (paragraph.startsWith('```')) {
+                          const lines = paragraph.split('\n');
+                          const language = lines[0].substring(3).trim();
+                          const code = lines.slice(1, -1).join('\n');
+                          
+                          return (
+                            <div key={i} className="bg-gray-100 p-4 rounded-md my-4 overflow-x-auto">
+                              <pre><code className={`language-${language}`}>{code}</code></pre>
+                            </div>
+                          );
+                        }
+                        
+                        // Regular paragraph
+                        return <p key={i} className="mb-4">{paragraph}</p>;
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+EOL
+
+echo "Updating ArchitectOutput component to handle book generation..."
+
+# Create the script to update ArchitectOutput.tsx
+cat > update-architect-output.js << 'EOL'
+const fs = require('fs');
+const path = require('path');
+
+// Path to the file
+const filePath = path.join('src', 'components', 'conversation', 'ArchitectOutput.tsx');
+
+// Read the file
+let content = fs.readFileSync(filePath, 'utf8');
+
+// Add import for the book viewer
+content = content.replace(
+  "import { FileImplementation } from '../../lib/types/architect';",
+  "import { FileImplementation, ImplementationBook } from '../../lib/types/architect';\nimport { ImplementationBookViewer } from '../book/ImplementationBook';"
+);
+
+// Update the ArchitectOutputProps interface
+content = content.replace(
+  /interface ArchitectOutputProps {[^}]*}/s,
+  `interface ArchitectOutputProps {
+  level1Output: ArchitectLevel1 | null;
+  level2Output: ArchitectLevel2 | null;
+  level3Output: ArchitectLevel3 | null;
+  currentLevel: 1 | 2 | 3;
+  isThinking: boolean;
+  error: string | null;
+  completedFiles: number;
+  totalFiles: number;
+  currentSpecialist: number;
+  totalSpecialists: number;
+  generatedFiles: FileImplementation[];
+  activeFile: FileImplementation | null;
+  setActiveFile: (file: FileImplementation | null) => void;
+  onProceedToNextLevel: () => void;
+  onGenerateBook?: () => void;
+  bookGenerationProgress?: {
+    totalChapters: number;
+    completedChapters: number;
+    currentChapter: string;
+    progress: number;
+  };
+}`
+);
+
+// Add state for showing the book
+content = content.replace(
+  "const [showIDE, setShowIDE] = useState(false);",
+  "const [showIDE, setShowIDE] = useState(false);\n  const [showBook, setShowBook] = useState(false);"
+);
+
+// Add the case for book generation button
+content = content.replace(
+  "const getButtonText = () => {",
+  `const getButtonText = () => {
+    if (currentLevel === 2 && level2Output?.implementationBook) {
+      return 'View Implementation Book';
+    }`
+);
+
+// Update the handleProceed function
+content = content.replace(
+  "const handleProceed = () => {",
+  `const handleProceed = () => {
+    if (currentLevel === 2 && level2Output?.implementationBook) {
+      setShowBook(true);
+      return;
+    }`
+);
+
+// Add book generation button
+content = content.replace(
+  "const canProceedToNextLevel = () => {",
+  `const handleGenerateBook = () => {
+    if (onGenerateBook) {
+      onGenerateBook();
+    }
+  };
+
+  const canProceedToNextLevel = () => {`
+);
+
+// Return the book viewer when showBook is true
+content = content.replace(
+  "if (showIDE) {",
+  `if (showBook && level2Output?.implementationBook) {
+    return (
+      <ImplementationBookViewer 
+        book={level2Output.implementationBook} 
+        onClose={() => setShowBook(false)}
+      />
+    );
+  }
+  
+  if (showIDE) {`
+);
+
+// Add book generation progress indicator
+content = content.replace(
+  "{currentLevel === 2 && level2Output &&
+  <div className="space-y-6">",
+  `{currentLevel === 2 && level2Output &&
+            <div className="space-y-6">
+              
+              {/* Book Generation Progress */}
+              {bookGenerationProgress && (
+                <div className="mb-4 bg-blue-50 rounded-lg p-4 border border-blue-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-base font-semibold text-blue-800">
+                      <BookOpen className="w-4 h-4 inline mr-2" />
+                      Generating Implementation Book
+                    </h3>
+                    <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                      {Math.round(bookGenerationProgress.progress)}%
+                    </div>
+                  </div>
+                  
+                  <div className="w-full bg-blue-200 rounded-full h-2.5 mb-2">
+                    <div 
+                      className="h-2.5 rounded-full bg-blue-600 transition-all duration-300"
+                      style={{ width: \`\${bookGenerationProgress.progress}%\` }}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-between text-xs text-blue-700">
+                    <span>
+                      {bookGenerationProgress.completedChapters} of {bookGenerationProgress.totalChapters} chapters
+                    </span>
+                    <span>Current: {bookGenerationProgress.currentChapter}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Generate Book Button - Show if we have CTO architecture but no book yet */}
+              {currentLevel === 2 && !level2Output.implementationBook && !bookGenerationProgress && (
+                <div className="mb-4">
+                  <button
+                    onClick={handleGenerateBook}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg px-5 py-3 flex items-center justify-center transition-colors"
+                  >
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Generate Comprehensive Implementation Book
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    This will create a detailed step-by-step guide for implementing the entire system
+                  </p>
+                </div>
+              )}`
+);
+
+// Save the file
+fs.writeFileSync(filePath, content, 'utf8');
+console.log('Updated ArchitectOutput.tsx successfully');
+EOL
+
+echo "Updating ArchitectOutput component..."
+node update-architect-output.js
+
+echo "Creating missing imports for Book icon..."
+cat > update-imports.js << 'EOL'
+const fs = require('fs');
+const path = require('path');
+
+// Path to the file
+const filePath = path.join('src', 'components', 'conversation', 'ArchitectOutput.tsx');
+
+// Read the file
+let content = fs.readFileSync(filePath, 'utf8');
+
+// Update the import for icons to include BookOpen
+content = content.replace(
+  /import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon, CheckIcon, BrainIcon, SearchIcon, LayersIcon, TerminalIcon, Users2Icon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';/,
+  "import { CodeIcon, FolderIcon, FileIcon, ArrowRightIcon, CheckIcon, BrainIcon, SearchIcon, LayersIcon, TerminalIcon, Users2Icon, ChevronDownIcon, ChevronUpIcon, BookOpen } from 'lucide-react';"
+);
+
+// Save the file
+fs.writeFileSync(filePath, content, 'utf8');
+console.log('Updated imports in ArchitectOutput.tsx successfully');
+EOL
+
+node update-imports.js
+
+# Update ConversationUI to use the new book generation function
+cat > update-conversation-ui.js << 'EOL'
+const fs = require('fs');
+const path = require('path');
+
+// Path to the file
+const filePath = path.join('src', 'components', 'conversation', 'ConversationUI.tsx');
+
+// Read the file
+let content = fs.readFileSync(filePath, 'utf8');
+
+// Add generateImplementationBook to the destructured imports
+content = content.replace(
+  'generateArchitectLevel1,',
+  'generateArchitectLevel1,\n    generateImplementationBook,'
+);
+
+// Add bookGenerationProgress to the props passed to ArchitectOutput
+content = content.replace(
+  'activeFile={activeFile}',
+  'activeFile={activeFile}\n                  bookGenerationProgress={architect.bookGenerationProgress}'
+);
+
+// Add onGenerateBook to the props
+content = content.replace(
+  'onProceedToNextLevel={() => {',
+  'onGenerateBook={generateImplementationBook}\n                  onProceedToNextLevel={() => {'
+);
+
+// Save the file
+fs.writeFileSync(filePath, content, 'utf8');
+console.log('Updated ConversationUI.tsx successfully');
+EOL
+
+node update-conversation-ui.js
+
+echo "===== CTO Implementation Book Enhancement Script Complete ====="
+echo "All modifications have been applied to create a comprehensive implementation book generator for the CTO layer."
+echo "Backups of original files can be found in: $backup_dir"

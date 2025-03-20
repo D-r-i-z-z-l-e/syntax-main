@@ -35,37 +35,6 @@ export interface FolderStructure {
   subfolders?: FolderStructure[];
 }
 
-export interface BookOutline {
-  title: string;
-  introduction: string;
-  chapters: Array<{
-    title: string;
-    sections: string[];
-  }>;
-}
-
-export interface ChapterContent {
-  content: string;
-  continuationContext: {
-    chapterTitle: string;
-    sections: string[];
-    completedContent: string;
-    remainingSections: string[];
-  } | null;
-}
-
-export interface ImplementationBook {
-  title: string;
-  introduction: string;
-  chapters: Array<{
-    title: string;
-    content: string;
-    isComplete: boolean;
-  }>;
-  isComplete: boolean;
-  lastUpdated: string;
-}
-
 export interface ArchitectLevel2 {
   integratedVision: string;
   rootFolder: FolderStructure;
@@ -73,7 +42,6 @@ export interface ArchitectLevel2 {
     files: FileNode[];
   };
   resolutionNotes: string[];
-  implementationBook?: ImplementationBook;
 }
 
 export interface FileImplementation {
@@ -103,12 +71,6 @@ export interface ArchitectState {
   totalFiles: number;
   currentSpecialist: number;
   totalSpecialists: number;
-  bookGenerationProgress?: {
-    totalChapters: number;
-    completedChapters: number;
-    currentChapter: string;
-    progress: number;
-  };
 }
 
 export interface ProjectFile {

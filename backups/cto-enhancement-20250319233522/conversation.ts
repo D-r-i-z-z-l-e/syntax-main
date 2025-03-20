@@ -47,7 +47,6 @@ export interface ConversationStore {
   generateArchitectLevel1: () => Promise<void>;
   generateArchitectLevel2: () => Promise<void>;
   generateArchitectLevel3: () => Promise<void>;
-  generateImplementationBook: () => Promise<void>;
   generateProjectStructure: (implementationPlan: ArchitectLevel3) => Promise<void>;
   setActiveFile: (file: FileImplementation | null) => void;
   reset: () => void;
@@ -87,8 +86,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     completedFiles: 0,
     totalFiles: 0,
     currentSpecialist: 0,
-    totalSpecialists: 0,
-    bookGenerationProgress: undefined
+    totalSpecialists: 0
   },
   generatedFiles: [],
   activeFile: null,
@@ -110,7 +108,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Reset architect state and start processing
+      // Reset architect state and start thinking
       set(state => ({
         architect: {
           ...state.architect,
@@ -123,8 +121,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           completedFiles: 0,
           totalFiles: 0,
           currentSpecialist: 0,
-          totalSpecialists: 0,
-          bookGenerationProgress: undefined
+          totalSpecialists: 0
         }
       }));
       
@@ -149,7 +146,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error('Invalid response from architect: missing specialists array');
       }
       
-      // Update state with generated specialists
+      // Update state with the generated specialist visions
       set(state => ({
         architect: {
           ...state.architect,
@@ -193,7 +190,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Update state to show processing
+      // Reset level 2+ and start thinking
       set(state => ({
         architect: {
           ...state.architect,
@@ -203,8 +200,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           level2Output: null,
           level3Output: null,
           completedFiles: 0,
-          totalFiles: 0,
-          bookGenerationProgress: undefined
+          totalFiles: 0
         }
       }));
       
@@ -230,10 +226,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error('Invalid level 2 response: missing rootFolder, dependencyTree, or integratedVision');
       }
       
-      // Calculate total files
+      // Get the total number of files for progress tracking
       const totalFiles = data.dependencyTree.files ? data.dependencyTree.files.length : 0;
       
-      // Update state with generated architecture
+      // Update state with the CTO's integrated vision and structure
       set(state => ({
         architect: {
           ...state.architect,
@@ -251,125 +247,6 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           error: error instanceof Error ? error.message : 'Failed to generate integrated vision',
           isThinking: false,
           currentLevel: 1
-        }
-      }));
-    }
-  },
-  
-  generateImplementationBook: async () => {
-    const state = get();
-    const { level2Output } = state.architect;
-    const requirements = state.context.extractedInfo.requirements;
-    
-    if (!level2Output || !requirements?.length) {
-      set(state => ({
-        architect: {
-          ...state.architect,
-          error: 'Missing integrated vision or requirements for implementation book generation'
-        }
-      }));
-      return;
-    }
-    
-    console.log('Starting implementation book generation');
-    
-    try {
-      // Update state to show book generation in progress
-      set(state => ({
-        architect: {
-          ...state.architect,
-          isThinking: true,
-          error: null,
-          bookGenerationProgress: {
-            totalChapters: 0,
-            completedChapters: 0,
-            currentChapter: 'Initializing',
-            progress: 0
-          }
-        }
-      }));
-      
-      // Start the background generation process
-      const response = await fetch('/api/book-generation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requirements,
-          level2Output,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to start book generation: ${response.statusText} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Update state with book generation started
-      set(state => ({
-        architect: {
-          ...state.architect,
-          isThinking: false,
-          bookGenerationProgress: {
-            totalChapters: data.totalChapters || 0,
-            completedChapters: 0,
-            currentChapter: data.currentChapter || 'Starting',
-            progress: 0
-          }
-        }
-      }));
-      
-      // Poll for updates - in a real implementation, you'd use WebSockets
-      const pollInterval = setInterval(async () => {
-        try {
-          const pollResponse = await fetch(`/api/book-generation-status?id=${data.generationId}`);
-          if (pollResponse.ok) {
-            const statusData = await pollResponse.json();
-            
-            // Update progress
-            set(state => ({
-              architect: {
-                ...state.architect,
-                bookGenerationProgress: {
-                  totalChapters: statusData.totalChapters,
-                  completedChapters: statusData.completedChapters,
-                  currentChapter: statusData.currentChapter,
-                  progress: statusData.progress
-                }
-              }
-            }));
-            
-            // If complete, update the level2Output with the book
-            if (statusData.isComplete) {
-              clearInterval(pollInterval);
-              
-              if (statusData.book) {
-                set(state => ({
-                  architect: {
-                    ...state.architect,
-                    level2Output: {
-                      ...state.architect.level2Output!,
-                      implementationBook: statusData.book
-                    }
-                  }
-                }));
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error polling book generation status:', error);
-        }
-      }, 5000);
-      
-    } catch (error) {
-      console.error('Error starting implementation book generation:', error);
-      set(state => ({
-        architect: {
-          ...state.architect,
-          error: error instanceof Error ? error.message : 'Failed to generate implementation book',
-          isThinking: false,
-          bookGenerationProgress: undefined
         }
       }));
     }
@@ -399,7 +276,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
     
     try {
-      // Update state to show processing
+      // Reset level 3 and start thinking
       set(state => ({
         architect: {
           ...state.architect,
@@ -433,7 +310,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         throw new Error('Invalid code implementation response: missing or invalid implementations');
       }
       
-      // Update state with generated implementations
+      // Update state with the generated code implementations
       set(state => ({
         architect: {
           ...state.architect,
@@ -465,7 +342,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const requirements = state.context.extractedInfo.requirements;
       const { level2Output } = state.architect;
       
-      // Validate required inputs
+      // Validate inputs
       if (!requirements?.length || !level2Output?.integratedVision || !level2Output?.rootFolder || !implementationPlan?.implementations) {
         const missing = [];
         if (!requirements?.length) missing.push('requirements');
@@ -495,7 +372,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const data = await response.json();
       console.log('Project structure successfully generated');
       
-      // Update state with the generated project structure
+      // Update state with the project structure
       set({ 
         projectStructure: data.structure, 
         isGeneratingStructure: false,
@@ -510,8 +387,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           completedFiles: 0,
           totalFiles: 0,
           currentSpecialist: 0,
-          totalSpecialists: 0,
-          bookGenerationProgress: undefined
+          totalSpecialists: 0
         }
       });
     } catch (error) {
@@ -688,8 +564,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         completedFiles: 0,
         totalFiles: 0,
         currentSpecialist: 0,
-        totalSpecialists: 0,
-        bookGenerationProgress: undefined
+        totalSpecialists: 0
       },
       generatedFiles: [],
       activeFile: null,
